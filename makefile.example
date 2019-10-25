@@ -1,0 +1,23 @@
+ALLOCS = 1000 # Higher value = smaller generated file but slower compilation. Recommended for release: 100000
+FLAGS = -mz80 --code-loc 0x180 --data-loc 0 --no-std-crt0 --disable-warning 196 --disable-warning 85 --max-allocs-per-node $(ALLOCS) --allow-unsafe-read --opt-code-size
+LIBS =  crt0msx_msxdos_advanced.rel printf_simple.rel putchar_msxdos.rel
+
+ifeq ($(OS),Windows_NT)
+	RM = del
+endif
+
+all: nhttp.com
+
+nhttp.com: nhttp.c
+	sdcc $(FLAGS) -o nhttp.ihx $(LIBS) nhttp.c
+	hex2bin -e com nhttp.ihx
+
+clean:
+	$(RM) *.ihx
+	$(RM) *.map
+	$(RM) *.sym
+	$(RM) *.lst
+	$(RM) *.lk
+	$(RM) *.noi
+	$(RM) nhttp.asm
+	$(RM) nhttp.rel

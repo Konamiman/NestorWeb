@@ -1,0 +1,10 @@
+*.com
+*.ihx
+*.lk
+*.lst
+*.map
+*.noi
+*.asm
+*.rel
+*.sym
+makefile
