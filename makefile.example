@@ -1,6 +1,8 @@
+# crt0msx_msxdos_advanced.rel, printf_simple.rel, putchar_msxdos.rel - available at konamiman.com
 ALLOCS = 1000 # Higher value = smaller generated file but slower compilation. Recommended for release: 100000
-FLAGS = -mz80 --code-loc 0x180 --data-loc 0 --no-std-crt0 --disable-warning 196 --disable-warning 85 --max-allocs-per-node $(ALLOCS) --allow-unsafe-read --opt-code-size
-LIBS =  crt0msx_msxdos_advanced.rel printf_simple.rel putchar_msxdos.rel
+COMMON_FLAGS = -mz80 --disable-warning 196 --disable-warning 85 --max-allocs-per-node $(ALLOCS) --allow-unsafe-read --opt-code-size
+PROGRAM_FLAGS = --code-loc 0x180 --data-loc 0 --no-std-crt0
+LIBS = crt0msx_msxdos_advanced.rel printf_simple.rel putchar_msxdos.rel asm.lib
 
 ifeq ($(OS),Windows_NT)
 	RM = del
@@ -8,9 +10,12 @@ endif
 
 all: nhttp.com
 
-nhttp.com: nhttp.c
-	sdcc $(FLAGS) -o nhttp.ihx $(LIBS) nhttp.c
+nhttp.com: nhttp.c system.rel
+	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nhttp.ihx $(LIBS) system.rel nhttp.c
 	hex2bin -e com nhttp.ihx
+
+system.rel: system.c
+	sdcc -c $(COMMON_FLAGS) system.c
 
 clean:
 	$(RM) *.ihx
@@ -21,3 +26,4 @@ clean:
 	$(RM) *.noi
 	$(RM) nhttp.asm
 	$(RM) nhttp.rel
+	$(RM) system.rel

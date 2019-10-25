@@ -7,4 +7,6 @@
 *.asm
 *.rel
 *.sym
+asm.h
+asm.lib
 makefile
