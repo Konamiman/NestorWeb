@@ -20,5 +20,5 @@ bool TcpIpSupportsPassiveTcpConnections()
 {
     regs.Bytes.B = 1;
     UnapiCall(&tcpip_unapi_code_block, TCPIP_GET_CAPAB, &regs, REGS_MAIN, REGS_MAIN);
-    return regs.Bytes.L & (1 << 5) != 0;
+    return regs.Bytes.L & TCPIP_CAPAB_OPEN_TCP_PASSIVE_CONN_WITH_NO_REMOTE_SOCKET != 0;
 }

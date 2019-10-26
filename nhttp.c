@@ -13,8 +13,7 @@ const char* strTitle =
 const char* strHelp =
     "This is the program help!";
 
-void CheckPrerequisites();
-void CheckTcpIpSupportsPassiveConnections();
+void Initialize();
 void TerminateWithErrorMessage(char* message);
 
 int main(char** argv, int argc)
@@ -26,9 +25,7 @@ int main(char** argv, int argc)
         TerminateWithErrorCode(0);
     }
 
-    CheckPrerequisites();
-    InitializeTcpIpUnapi();
-    CheckTcpIpSupportsPassiveConnections();
+    Initialize();
 
     printf("The program itself!");
     TerminateWithErrorCode(0);
@@ -36,19 +33,16 @@ int main(char** argv, int argc)
     return 0;
 }
 
-void CheckPrerequisites()
-{
-    if(!MsxDos2IsRunning())
-        TerminateWithErrorMessage("MSX-DOS 2 required");
 
-    if(!TcpIpUnapiIsAvailable())
-        TerminateWithErrorMessage("No TCP/IP UNAPI implementations found");
-}
+#define CHECK(function, message) if(!function()) { TerminateWithErrorMessage(message); }
 
-void CheckTcpIpSupportsPassiveConnections()
+void Initialize()
 {
-    if(!TcpIpSupportsPassiveTcpConnections())
-        TerminateWithErrorMessage("The TCP/IP UNAPI implementation doesn't support passive TCP connections");;
+    CHECK(MsxDos2IsRunning, "MSX-DOS 2 required");
+
+    CHECK(TcpIpUnapiIsAvailable, "No TCP/IP UNAPI implementations found");
+    InitializeTcpIpUnapi();
+    CHECK(TcpIpSupportsPassiveTcpConnections, "The TCP/IP UNAPI implementation doesn't support passive TCP connections");
 }
 
 void TerminateWithErrorMessage(char* message)

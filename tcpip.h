@@ -2,11 +2,8 @@
 #include "asm.h"
 
 enum TcpipUnapiFunctions {
-    UNAPI_GET_INFO = 0,
     TCPIP_GET_CAPAB = 1,
     TCPIP_NET_STATE = 3,
-    TCPIP_DNS_Q = 6,
-    TCPIP_DNS_S = 7,
     TCPIP_TCP_OPEN = 13,
     TCPIP_TCP_CLOSE = 14,
     TCPIP_TCP_ABORT = 15,
@@ -16,7 +13,7 @@ enum TcpipUnapiFunctions {
     TCPIP_WAIT = 29
 };
 
-enum TcpipErrorCodes {
+enum TcpipUnapiErrorCodes {
     ERR_OK = 0,			    
     ERR_NOT_IMP,		
     ERR_NO_NETWORK,		
@@ -34,6 +31,8 @@ enum TcpipErrorCodes {
     ERR_LARGE_DGRAM,	
     ERR_INV_OPER
 };
+
+#define TCPIP_CAPAB_OPEN_TCP_PASSIVE_CONN_WITH_NO_REMOTE_SOCKET (1 << 5)
 
 bool TcpIpUnapiIsAvailable();
 void InitializeTcpIpUnapi();
