@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "types.h"
 #include "system.h"
+#include "tcpip.h"
 
 #define VERSION "0.1" 
 
@@ -13,6 +14,7 @@ const char* strHelp =
     "This is the program help!";
 
 void CheckPrerequisites();
+void CheckTcpIpSupportsPassiveConnections();
 void TerminateWithErrorMessage(char* message);
 
 int main(char** argv, int argc)
@@ -25,6 +27,8 @@ int main(char** argv, int argc)
     }
 
     CheckPrerequisites();
+    InitializeTcpIpUnapi();
+    CheckTcpIpSupportsPassiveConnections();
 
     printf("The program itself!");
     TerminateWithErrorCode(0);
@@ -36,6 +40,15 @@ void CheckPrerequisites()
 {
     if(!MsxDos2IsRunning())
         TerminateWithErrorMessage("MSX-DOS 2 required");
+
+    if(!TcpIpUnapiIsAvailable())
+        TerminateWithErrorMessage("No TCP/IP UNAPI implementations found");
+}
+
+void CheckTcpIpSupportsPassiveConnections()
+{
+    if(!TcpIpSupportsPassiveTcpConnections())
+        TerminateWithErrorMessage("The TCP/IP UNAPI implementation doesn't support passive TCP connections");;
 }
 
 void TerminateWithErrorMessage(char* message)
