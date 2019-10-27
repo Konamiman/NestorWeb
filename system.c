@@ -3,19 +3,19 @@
 #include "asm.h"
 #include "msxdos.h"
 #include "string.h"
-
 #include "stdio.h"
+
 
 static Z80_registers regs;
 fileInfoBlock fib;
 
-void TerminateWithErrorCode(byte errorCode);
 
 bool MsxDos2IsRunning()
 {
     DosCall(F_DOSVER, &regs, REGS_MAIN, REGS_MAIN);
     return regs.Bytes.A == 0 && regs.Bytes.B >= 2;
 }
+
 
 void TerminateWithErrorCode(byte errorCode)
 {
@@ -24,6 +24,7 @@ void TerminateWithErrorCode(byte errorCode)
     //Fallback in case we are in MSX-DOS 1
     DosCall(F_TERM0, &regs, REGS_NONE, REGS_NONE);
 }
+
 
 byte NormalizeDirectory(char* directoryPath, char* normalizedDirectoryPath)
 {

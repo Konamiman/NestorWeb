@@ -15,9 +15,11 @@ const char* strHelp =
 
 char base_directory[64];
 
+
 void ProcessArguments(char** argv, int argc);
 void Initialize();
 void TerminateWithErrorMessage(char* message);
+
 
 int main(char** argv, int argc)
 {
@@ -50,13 +52,18 @@ void ProcessArguments(char** argv, int argc)
 
 void Initialize()
 {
+    byte buffer[4];
+
     CHECK(MsxDos2IsRunning, "MSX-DOS 2 required");
 
     CHECK(TcpIpUnapiIsAvailable, "No TCP/IP UNAPI implementations found");
     InitializeTcpIpUnapi();
     CHECK(TcpIpSupportsPassiveTcpConnections, "The TCP/IP UNAPI implementation doesn't support passive TCP connections");
 
-    printf("Base directory: %s", base_directory);
+    printf("Base directory: %s\r\n", base_directory);
+
+    GetLocalIpAddress(buffer);
+    printf("Listening on %i.%i.%i.%i:80\r\n", buffer[0], buffer[1], buffer[2], buffer[3]);
 }
 
 

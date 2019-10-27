@@ -3,6 +3,7 @@
 
 enum TcpipUnapiFunctions {
     TCPIP_GET_CAPAB = 1,
+    TCPIP_GET_IPINFO = 2,
     TCPIP_NET_STATE = 3,
     TCPIP_TCP_OPEN = 13,
     TCPIP_TCP_CLOSE = 14,
@@ -37,3 +38,4 @@ enum TcpipUnapiErrorCodes {
 bool TcpIpUnapiIsAvailable();
 void InitializeTcpIpUnapi();
 bool TcpIpSupportsPassiveTcpConnections();
+void GetLocalIpAddress(byte* buffer);
