@@ -5,5 +5,6 @@
 
 bool MsxDos2IsRunning();
 void TerminateWithErrorCode(byte errorCode);
+byte NormalizeDirectory(char* directoryPath, char* normalizedDirectoryPath);
 
 #endif

@@ -191,4 +191,18 @@
 #define ERR_INSDSK 0x7F
 #define ERR_PRAK   0x7E
 
+// Data structures
+
+typedef struct {
+    byte alwaysFF;
+    char filename[13];
+    byte attributes;
+    byte timeOfModification[2];
+    byte dateOfModification[2];
+    unsigned int startCluster;
+    unsigned long fileSize;
+    byte logicalDrive;
+    byte internal[38];
+} fileInfoBlock;
+
 #endif

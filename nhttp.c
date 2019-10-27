@@ -11,26 +11,38 @@ const char* strTitle =
     "\r\n";
 
 const char* strHelp =
-    "This is the program help!";
+    "Usage: NHTTP <base directory>";
 
+char base_directory[64];
+
+void ProcessArguments(char** argv, int argc);
 void Initialize();
 void TerminateWithErrorMessage(char* message);
 
 int main(char** argv, int argc)
 {
     printf(strTitle);
+
+    ProcessArguments(argv, argc);
+    Initialize();
+
+    return 0;
+}
+
+
+void ProcessArguments(char** argv, int argc)
+{
+    byte error;
+
     if(argc == 0)
     {
         printf(strHelp);
         TerminateWithErrorCode(0);
     }
 
-    Initialize();
-
-    printf("The program itself!");
-    TerminateWithErrorCode(0);
-
-    return 0;
+    error = NormalizeDirectory(argv[0] , base_directory);
+    if(error != 0)
+        TerminateWithErrorCode(error);
 }
 
 
@@ -43,7 +55,10 @@ void Initialize()
     CHECK(TcpIpUnapiIsAvailable, "No TCP/IP UNAPI implementations found");
     InitializeTcpIpUnapi();
     CHECK(TcpIpSupportsPassiveTcpConnections, "The TCP/IP UNAPI implementation doesn't support passive TCP connections");
+
+    printf("Base directory: %s", base_directory);
 }
+
 
 void TerminateWithErrorMessage(char* message)
 {
