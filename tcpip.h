@@ -39,3 +39,5 @@ bool TcpIpUnapiIsAvailable();
 void InitializeTcpIpUnapi();
 bool TcpIpSupportsPassiveTcpConnections();
 void GetLocalIpAddress(byte* buffer);
+void LetTcpipBreathe();
+

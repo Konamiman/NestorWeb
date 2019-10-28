@@ -37,3 +37,9 @@ void GetLocalIpAddress(byte* buffer)
     buffer[2] = regs.Bytes.E;
     buffer[3] = regs.Bytes.D;
 }
+
+
+void LetTcpipBreathe()
+{
+    UnapiCall(&tcpip_unapi_code_block, TCPIP_WAIT, &regs, REGS_NONE, REGS_NONE);
+}

@@ -2,6 +2,7 @@
 #include "types.h"
 #include "system.h"
 #include "tcpip.h"
+#include "http.h"
 
 #define VERSION "0.1" 
 
@@ -32,6 +33,8 @@ int main(char** argv, int argc)
 
     while(!ExitRequested())
     {
+        DoHttpServerAutomatonStep();
+        LetTcpipBreathe();
     }
 
     printf("Exiting...");
