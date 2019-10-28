@@ -36,7 +36,25 @@ enum TcpipUnapiErrorCodes {
 };
 
 
+typedef struct {
+    byte remoteIP[4];
+    uint remotePort;
+    uint localPort;
+    uint timeoutValue;
+    byte flags;
+} tcpConnectionParameters;
+
+#define TCP_OPEN_FLAGS_PASSIVE 1
+
+
 #define TCPIP_CAPAB_OPEN_TCP_PASSIVE_CONN_WITH_NO_REMOTE_SOCKET (1 << 5)
+
+
+#define TCP_STATE_CLOSED 0
+#define TCP_STATE_LISTEN 1
+#define TCP_STATE_ESTABLISHED 4
+#define TCP_STATE_CLOSE_WAIT 7
+#define TCP_STATE_CLOSING 8
 
 
 bool TcpIpUnapiIsAvailable();
@@ -45,4 +63,6 @@ bool TcpIpSupportsPassiveTcpConnections();
 void GetLocalIpAddress(byte* buffer);
 void LetTcpipBreathe();
 void AbortAllTransientTcpConnections();
-
+byte OpenPassiveTcpConnection();
+byte GetSimplifiedTcpConnectionState();
+void CloseTcpConnection();

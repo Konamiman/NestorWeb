@@ -25,6 +25,7 @@ void Cleanup();
 
 
 #define ExitRequested() KeyIsPressed()
+#define HttpAutomatonHasReportedAFatalError() (http_error_buffer[0] != '\0')
 
 int main(char** argv, int argc)
 {
@@ -36,7 +37,7 @@ int main(char** argv, int argc)
     while(!ExitRequested())
     {
         DoHttpServerAutomatonStep();
-        if(http_error_buffer[0] != '\0')
+        if(HttpAutomatonHasReportedAFatalError())
         {
             Cleanup();
             TerminateWithErrorMessage(http_error_buffer);
