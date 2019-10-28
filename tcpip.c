@@ -43,3 +43,10 @@ void LetTcpipBreathe()
 {
     UnapiCall(&tcpip_unapi_code_block, TCPIP_WAIT, &regs, REGS_NONE, REGS_NONE);
 }
+
+
+void AbortAllTransientTcpConnections()
+{
+    regs.Bytes.B = 0;
+    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_ABORT, &regs, REGS_MAIN, REGS_NONE);
+}

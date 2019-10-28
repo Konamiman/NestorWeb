@@ -15,11 +15,13 @@ const char* strHelp =
     "Usage: NHTTP <base directory>";
 
 char base_directory[64];
+char http_error_buffer[80];
 
 
 void ProcessArguments(char** argv, int argc);
 void Initialize();
 void TerminateWithErrorMessage(char* message);
+void Cleanup();
 
 
 #define ExitRequested() KeyIsPressed()
@@ -34,10 +36,17 @@ int main(char** argv, int argc)
     while(!ExitRequested())
     {
         DoHttpServerAutomatonStep();
+        if(http_error_buffer[0] != '\0')
+        {
+            Cleanup();
+            TerminateWithErrorMessage(http_error_buffer);
+        }
+
         LetTcpipBreathe();
     }
 
     printf("Exiting...");
+    Cleanup();
     return 0;
 }
 
@@ -70,11 +79,15 @@ void Initialize()
     InitializeTcpIpUnapi();
     CHECK(TcpIpSupportsPassiveTcpConnections, "The TCP/IP UNAPI implementation doesn't support passive TCP connections");
 
+    AbortAllTransientTcpConnections();
+
     printf("Base directory: %s\r\n", base_directory);
 
     GetLocalIpAddress(buffer);
     printf("Listening on %i.%i.%i.%i:80\r\n", buffer[0], buffer[1], buffer[2], buffer[3]);
     printf("Press any key to exit\r\n\r\n");
+
+    InitializeHttpAutomaton(http_error_buffer);
 }
 
 
@@ -82,4 +95,10 @@ void TerminateWithErrorMessage(char* message)
 {
     printf("*** %s\r\n", message);
     TerminateWithErrorCode(1);
+}
+
+
+void Cleanup()
+{
+    AbortAllTransientTcpConnections();
 }

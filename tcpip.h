@@ -1,6 +1,7 @@
 #include "types.h"
 #include "asm.h"
 
+
 enum TcpipUnapiFunctions {
     TCPIP_GET_CAPAB = 1,
     TCPIP_GET_IPINFO = 2,
@@ -13,6 +14,7 @@ enum TcpipUnapiFunctions {
     TCPIP_TCP_RCV = 18,
     TCPIP_WAIT = 29
 };
+
 
 enum TcpipUnapiErrorCodes {
     ERR_OK = 0,			    
@@ -33,11 +35,14 @@ enum TcpipUnapiErrorCodes {
     ERR_INV_OPER
 };
 
+
 #define TCPIP_CAPAB_OPEN_TCP_PASSIVE_CONN_WITH_NO_REMOTE_SOCKET (1 << 5)
+
 
 bool TcpIpUnapiIsAvailable();
 void InitializeTcpIpUnapi();
 bool TcpIpSupportsPassiveTcpConnections();
 void GetLocalIpAddress(byte* buffer);
 void LetTcpipBreathe();
+void AbortAllTransientTcpConnections();
 
