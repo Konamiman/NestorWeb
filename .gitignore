@@ -10,3 +10,4 @@
 asm.h
 asm.lib
 makefile
+.vscode

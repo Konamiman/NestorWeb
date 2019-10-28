@@ -21,6 +21,8 @@ void Initialize();
 void TerminateWithErrorMessage(char* message);
 
 
+#define ExitRequested() KeyIsPressed()
+
 int main(char** argv, int argc)
 {
     printf(strTitle);
@@ -28,6 +30,11 @@ int main(char** argv, int argc)
     ProcessArguments(argv, argc);
     Initialize();
 
+    while(!ExitRequested())
+    {
+    }
+
+    printf("Exiting...");
     return 0;
 }
 
@@ -64,6 +71,7 @@ void Initialize()
 
     GetLocalIpAddress(buffer);
     printf("Listening on %i.%i.%i.%i:80\r\n", buffer[0], buffer[1], buffer[2], buffer[3]);
+    printf("Press any key to exit\r\n\r\n");
 }
 
 

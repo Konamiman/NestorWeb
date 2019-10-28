@@ -76,3 +76,11 @@ byte NormalizeDirectory(char* directoryPath, char* normalizedDirectoryPath)
 
     return 0;
 }
+
+
+bool KeyIsPressed()
+{
+    regs.Bytes.E = 0xFF;
+    DosCall(F_DIRIO, &regs, REGS_MAIN, REGS_MAIN);
+    return regs.Bytes.A != 0;
+}
