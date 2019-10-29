@@ -2,6 +2,7 @@
 #include "asm.h"
 #include "tcpip.h"
 #include "stdio.h"
+#include <string.h>
 
 
 static unapi_code_block tcpip_unapi_code_block;
@@ -127,6 +128,7 @@ void CloseTcpConnection()
 
     regs.Bytes.B = connection_id;
     UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_CLOSE, &regs, REGS_MAIN, REGS_NONE);
+    connection_id = 0;
 }
 
 
@@ -158,4 +160,23 @@ byte GetIncomingTcpByte()
     
     data_buffer_length--;
     return *data_buffer_pointer++;
+}
+
+
+bool SendDataToTcpConnection(byte* data, int length)
+{
+    regs.Bytes.B = connection_id;
+    regs.Words.DE = (int)data;
+    regs.Words.HL = length;
+    regs.Bytes.C = TCP_SEND_FLAGS_PUSH;
+    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_SEND, &regs, REGS_MAIN, REGS_MAIN);
+    
+    //Any other error means the connection is in a wrong state and will be handled by the HTTP automaton
+    return regs.Bytes.A != ERR_BUFFER;
+}
+
+
+bool SendStringToTcpConnection(char* string)
+{
+    return SendDataToTcpConnection(string, strlen(string));
 }

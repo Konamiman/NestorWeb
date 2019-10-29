@@ -3,8 +3,7 @@
 #include "system.h"
 #include "tcpip.h"
 #include "http.h"
-
-#define VERSION "0.1" 
+#include "version.h"
 
 const char* strTitle = 
     "NestorHTTP " VERSION "\r\n"

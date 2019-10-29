@@ -1,8 +1,13 @@
 #include "types.h"
+#include "system.h"
 #include "http.h"
 #include "stdio.h"
 #include "tcpip.h"
+#include "version.h"
 #include <string.h>
+
+
+#define MAX_SECONDS_WITHOUT_DATA 3
 
 
 static byte automaton_state;
@@ -11,15 +16,30 @@ static byte data_buffer[256+1];
 static byte* data_buffer_pointer;
 static int data_buffer_length;
 static bool skipping_data;
+static int last_system_timer_value;
+static int ticks_without_data;
 
-#define InitializeDataBuffer() { data_buffer_pointer = data_buffer; data_buffer_length = 0; skipping_data = 0;}
 
-
+static void InitializeDataBuffer();
 static void OpenServerConnection();
 static void HandleIncomingConnectionIfAvailable();
+static void CloseConnectionToClient();
 static void ContinueReadingRequest();
 static bool ContinueReadingLine();
+static void ResetInactivityCounter();
+static void UpdateInactivityCounter();
 static void ContinueReadingHeaders();
+static void SendLineToClient(char* line);
+static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
+
+
+static void InitializeDataBuffer()
+{
+    data_buffer_pointer = data_buffer; 
+    data_buffer_length = 0;
+    skipping_data = 0;
+    ResetInactivityCounter();
+}
 
 
 void InitializeHttpAutomaton(char* http_error_buffer)
@@ -32,6 +52,12 @@ void InitializeHttpAutomaton(char* http_error_buffer)
 
 void DoHttpServerAutomatonStep()
 {
+    if(ticks_without_data >= MAX_SECONDS_WITHOUT_DATA * 50)
+    {
+        printf("Closing connection for client inactivity\r\n");
+        CloseConnectionToClient();
+    }
+
     switch(automaton_state)
     {
         case HTTPA_NONE:
@@ -90,10 +116,17 @@ static void HandleIncomingConnectionIfAvailable()
         case TCP_STATE_CLOSE_WAIT:
             //That would be weird, but can happen if the client
             //opens and closes the connection in quick succession
-            CloseTcpConnection();
-            automaton_state = HTTPA_NONE;
+            CloseConnectionToClient();
             break;
     }
+}
+
+
+static void CloseConnectionToClient()
+{
+    CloseTcpConnection();
+    ResetInactivityCounter();
+    automaton_state = HTTPA_NONE;
 }
 
 
@@ -137,12 +170,13 @@ static void ContinueReadingRequest()
 }
 
 
-bool ContinueReadingLine()
+static bool ContinueReadingLine()
 {
     byte datum;
 
     while(EnsureIncomingTcpDataIsAvailable())
     {
+        ResetInactivityCounter();
         datum = GetIncomingTcpByte();
 
         if(datum == '\n')
@@ -170,7 +204,24 @@ bool ContinueReadingLine()
         return true;
     }
 
+    UpdateInactivityCounter();
     return false;
+}
+
+
+static void ResetInactivityCounter()
+{
+    last_system_timer_value = SYSTEM_TIMER;
+    ticks_without_data = 0;
+}
+
+
+static void UpdateInactivityCounter()
+{
+    if(SYSTEM_TIMER == last_system_timer_value)
+        return;
+    
+    ticks_without_data++;
 }
 
 
@@ -205,7 +256,44 @@ static void ContinueReadingHeaders()
     }
     else
     {
-        //WIP
-        AbortAllTransientTcpConnections();
+        SendHtmlResponseToClient(500, "Internal server error", 
+            "<html>"
+            "<head>"
+            "<style type='text/css'>body {font-family: sans-serif;} .footer {font-size: small; color: gray; font-style: italic;}</style>"
+            "</head>"
+            "<body>"
+            "<h1>Ooops!</h1>"
+            "<p>Estamous trabajandou en ellou...</p>"
+            "<p class='footer'>NestorHTTP " VERSION "</p>"
+            "</body>"
+            "</html>");
+        CloseConnectionToClient();
+    }
+}
+
+
+static void SendLineToClient(char* line)
+{
+    sprintf(data_buffer, "%s\r\n", line);
+    printf("--> %s", data_buffer);
+    SendStringToTcpConnection(data_buffer);
+}
+
+
+static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content)
+{
+    char buffer[64];
+
+    sprintf(buffer, "HTTP/1.1 %i %s", statusCode, statusMessage);
+    SendLineToClient(buffer);
+    SendLineToClient("X-Powered-By: NestorHTTP/" VERSION "; MSX-DOS");
+    sprintf(buffer, "Content-Length: %i", content ? strlen(content) : 0);
+    SendLineToClient(buffer);
+    if(content)
+    {
+        SendLineToClient("Content-Type: text/html");
+        SendLineToClient("");
+        printf("--> (response)\r\n");
+        SendStringToTcpConnection(content);
     }
 }

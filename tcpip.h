@@ -48,6 +48,7 @@ typedef struct {
 
 
 #define TCPIP_CAPAB_OPEN_TCP_PASSIVE_CONN_WITH_NO_REMOTE_SOCKET (1 << 5)
+#define TCP_SEND_FLAGS_PUSH 1
 
 
 #define TCP_STATE_CLOSED 0
@@ -68,4 +69,7 @@ byte GetSimplifiedTcpConnectionState();
 void CloseTcpConnection();
 bool EnsureIncomingTcpDataIsAvailable();
 byte GetIncomingTcpByte();
+bool SendDataToTcpConnection(byte* data, int length);
+bool SendStringToTcpConnection(char* string);
+
 
