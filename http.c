@@ -4,10 +4,11 @@
 #include "stdio.h"
 #include "tcpip.h"
 #include "version.h"
+#include "utils.h"
 #include <string.h>
 
 
-#define MAX_SECONDS_WITHOUT_DATA 3
+#define MAX_SECONDS_WITHOUT_DATA 5
 
 
 static byte automaton_state;
@@ -18,6 +19,7 @@ static int data_buffer_length;
 static bool skipping_data;
 static int last_system_timer_value;
 static int ticks_without_data;
+static byte output_data_buffer[512];
 
 
 static void InitializeDataBuffer();
@@ -31,6 +33,7 @@ static void UpdateInactivityCounter();
 static void ContinueReadingHeaders();
 static void SendLineToClient(char* line);
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
+static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
 
 
 static void InitializeDataBuffer()
@@ -127,6 +130,7 @@ static void CloseConnectionToClient()
     CloseTcpConnection();
     ResetInactivityCounter();
     automaton_state = HTTPA_NONE;
+    printf("I have closed the connection with the client\r\n");
 }
 
 
@@ -164,9 +168,16 @@ static void ContinueReadingRequest()
         return;
     }
 
-    //TODO: Process request
-    InitializeDataBuffer();
-    automaton_state = HTTPA_READING_HEADERS;
+    if(strncmpi(data_buffer, "GET", 3))
+    {
+        InitializeDataBuffer();
+        automaton_state = HTTPA_READING_HEADERS;
+    }
+    else
+    {
+        SendErrorResponseToClient(405, "Method Not Allowed", "Sorry, this is a GET only server for now");
+        CloseConnectionToClient();
+    }
 }
 
 
@@ -256,17 +267,7 @@ static void ContinueReadingHeaders()
     }
     else
     {
-        SendHtmlResponseToClient(500, "Internal server error", 
-            "<html>"
-            "<head>"
-            "<style type='text/css'>body {font-family: sans-serif;} .footer {font-size: small; color: gray; font-style: italic;}</style>"
-            "</head>"
-            "<body>"
-            "<h1>Ooops!</h1>"
-            "<p>Estamous trabajandou en ellou...</p>"
-            "<p class='footer'>NestorHTTP " VERSION "</p>"
-            "</body>"
-            "</html>");
+        SendErrorResponseToClient(404, "Not Found", "Please be patient, we're still setting up stuff here!");
         CloseConnectionToClient();
     }
 }
@@ -296,4 +297,33 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
         printf("--> (response)\r\n");
         SendStringToTcpConnection(content);
     }
+}
+
+
+static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage)
+{
+    if(!detailedMessage)
+    {
+        SendHtmlResponseToClient(statusCode, statusMessage, null);
+        return;
+    }
+
+    sprintf(
+        output_data_buffer,
+            "<html>"
+            "<head>"
+            "<style type='text/css'>body {font-family: sans-serif;} .footer {font-size: small; color: gray; font-style: italic;}</style>"
+            "</head>"
+            "<body>"
+            "<h1>%i %s</h1>"
+            "<p>%s</p>"
+            "<p class='footer'>NestorHTTP " VERSION "</p>"
+            "</body>"
+            "</html>",
+        statusCode,
+        statusMessage,
+        detailedMessage
+        );
+    
+    SendHtmlResponseToClient(statusCode, statusMessage, output_data_buffer);
 }
