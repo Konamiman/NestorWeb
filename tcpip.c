@@ -9,6 +9,10 @@ static const char* tcpip_unapi_identifier = "TCP/IP";
 static Z80_registers regs;
 static byte connection_id;
 
+static byte data_buffer[512];
+static byte* data_buffer_pointer;
+static int data_buffer_length;
+
 
 bool TcpIpUnapiIsAvailable()
 {
@@ -20,6 +24,7 @@ void InitializeTcpIpUnapi()
 {
     UnapiBuildCodeBlock(tcpip_unapi_identifier, 1, &tcpip_unapi_code_block);
     connection_id = 0;
+    data_buffer_length = 0;
 }
 
 
@@ -69,8 +74,11 @@ static byte _OpenPassiveTcpConnection(byte* connection_id)
     regs.Words.HL = (int)&params;
     UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_OPEN, &regs, REGS_MAIN, REGS_MAIN);
     if(regs.Bytes.A == 0)
+    {
+        data_buffer_length = 0;
         *connection_id = regs.Bytes.B;
-
+    }
+        
     return regs.Bytes.A;
 }
 
@@ -119,4 +127,35 @@ void CloseTcpConnection()
 
     regs.Bytes.B = connection_id;
     UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_CLOSE, &regs, REGS_MAIN, REGS_NONE);
+}
+
+
+bool EnsureIncomingTcpDataIsAvailable()
+{
+    if(data_buffer_length != 0)
+        return true;
+
+    regs.Bytes.B = connection_id;
+    regs.Words.DE = (int)data_buffer;
+    regs.Words.HL = sizeof(data_buffer);
+    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_RCV, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A != 0)
+        return false;
+    
+    data_buffer_pointer = data_buffer;
+    data_buffer_length = regs.Words.BC;
+
+    return data_buffer_length > 0;
+}
+
+
+byte GetIncomingTcpByte()
+{
+    //This should never happen, EnsureIncomingTcpDataIsAvailable should always
+    //be called before this method.
+    if(data_buffer_length == 0)
+        return 0;
+    
+    data_buffer_length--;
+    return *data_buffer_pointer++;
 }

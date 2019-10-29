@@ -66,3 +66,6 @@ void AbortAllTransientTcpConnections();
 byte OpenPassiveTcpConnection();
 byte GetSimplifiedTcpConnectionState();
 void CloseTcpConnection();
+bool EnsureIncomingTcpDataIsAvailable();
+byte GetIncomingTcpByte();
+
