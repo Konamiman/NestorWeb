@@ -490,6 +490,8 @@ static void ProcessFileRequest()
 {
     byte error;
     byte buffer[64];
+    byte buffer2[32];
+    dateTime date_time;
 
     error = SearchFile(filename_buffer, &file_fib, true);
     if(error == ERR_NOFIL)
@@ -537,13 +539,24 @@ static void ProcessFileRequest()
     }
 
     SendResponseStart(200, "Ok");
+    
     sprintf(buffer, content_length_str, file_fib.fileSize);
     SendLineToClient(buffer);
+    
     if(send_as_attachment)
     {
         sprintf(buffer, "Content-Disposition: attachment; filename=\"%s\"", file_fib.filename);
         SendLineToClient(buffer);
     }
+
+    if(file_fib.dateOfModification != 0)
+    {
+        ParseFibDateTime(&file_fib, &date_time);
+        ToVerboseDate(buffer2, &date_time);
+        sprintf(buffer, "Last-Modified: %s", buffer2);
+        SendLineToClient(buffer);
+    }
+
     SendLineToClient("");
 
     output_data_length = 0;

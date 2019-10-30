@@ -203,8 +203,8 @@ typedef struct {
     byte alwaysFF;
     char filename[13];
     byte attributes;
-    byte timeOfModification[2];
-    byte dateOfModification[2];
+    uint timeOfModification;
+    uint dateOfModification;
     unsigned int startCluster;
     unsigned long fileSize;
     byte logicalDrive;
