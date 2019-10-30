@@ -8,14 +8,14 @@
 #include "version.h"
 
 const char* strTitle = 
-    "NestorHTTP " VERSION "\r\n"
+    "NestorHTTP " VERSION " - the HTTP server for MSX\r\n"
     "(c) 2020 by Konamiman\r\n"
     "\r\n";
 
 const char* strHelp =
     "Usage: NHTTP <base directory> [p=<port>] [v=0|1|2] [t=<timeout>]\r\n"
     "\r\n"
-    "<port>: Server port number, 1-" MAX_USABLE_TCP_PORT_STR ", default is 80\r\n"
+    "p: Server port number, 1-" MAX_USABLE_TCP_PORT_STR ", default is 80\r\n"
     "v: Verbosity mode:\r\n"
     "   0: silent, 1: show connections and errors (default), 2: show all headers\r\n"
     "t: Inactivity timeout for client connections in seconds, default is " DEFAULT_INACTIVITY_TIMEOUT_SECS_STR
