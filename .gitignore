@@ -1,0 +1,13 @@
+*.com
+*.ihx
+*.lk
+*.lst
+*.map
+*.noi
+*.asm
+*.rel
+*.sym
+asm.h
+asm.lib
+makefile
+.vscode
