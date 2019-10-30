@@ -49,6 +49,8 @@ typedef struct {
 
 #define TCPIP_CAPAB_OPEN_TCP_PASSIVE_CONN_WITH_NO_REMOTE_SOCKET (1 << 5)
 #define TCP_SEND_FLAGS_PUSH 1
+#define MAX_USABLE_TCP_PORT 0xFFFE
+#define MAX_USABLE_TCP_PORT_STR "65534"
 
 
 #define TCP_STATE_CLOSED 0
@@ -64,7 +66,7 @@ bool TcpIpSupportsPassiveTcpConnections();
 void GetLocalIpAddress(byte* buffer);
 void LetTcpipBreathe();
 void AbortAllTransientTcpConnections();
-byte OpenPassiveTcpConnection();
+byte OpenPassiveTcpConnection(uint port);
 byte GetSimplifiedTcpConnectionState();
 void CloseTcpConnection();
 bool EnsureIncomingTcpDataIsAvailable();

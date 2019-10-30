@@ -1,13 +1,14 @@
 #include "types.h"
-#include "stdio.h"
+#include "utils.h"
+#include <stdio.h>
 
 bool strncmpi(const char *s1, const char *s2, int len) {
     char c1, c2;
 
     while(len--)
     {
-        c1 = (*s1++) | 32;
-        c2 = (*s2++) | 32;
+        c1 = ToLower(*s1++);
+        c2 = ToLower(*s2++);
 
         if(c1 == 0 && c2 == 0)
             return true;

@@ -1,1 +1,3 @@
-int strncmpi(const char *a1, const char *a2, int len);
+#define ToLower(c) ((c) | 32)
+
+bool strncmpi(const char *s1, const char *s2, int len);

@@ -11,7 +11,7 @@ endif
 
 all: nhttp.com
 
-nhttp.com: nhttp.c system.rel tcpip.rel http.rel utils.rel version.h
+nhttp.com: nhttp.c system.rel tcpip.rel http.rel utils.rel version.h tcpip.h
 	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nhttp.ihx $(LIBS) system.rel tcpip.rel http.rel utils.rel nhttp.c
 	hex2bin -e com nhttp.ihx
 
@@ -39,3 +39,4 @@ clean:
 	$(RM) system.rel
 	$(RM) tcpip.rel
 	$(RM) http.rel
+	$(RM) utils.rel

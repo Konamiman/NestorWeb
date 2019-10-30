@@ -62,13 +62,13 @@ void AbortAllTransientTcpConnections()
 }
 
 
-static byte _OpenPassiveTcpConnection(byte* connection_id)
+static byte _OpenPassiveTcpConnection(byte* connection_id, uint port)
 {
     tcpConnectionParameters params;
 
     *((ulong*)params.remoteIP) = 0;
     params.remotePort = 0;
-    params.localPort = 80;
+    params.localPort = port;
     params.timeoutValue = 0;
     params.flags = TCP_OPEN_FLAGS_PASSIVE;
 
@@ -84,15 +84,15 @@ static byte _OpenPassiveTcpConnection(byte* connection_id)
 }
 
 
-byte OpenPassiveTcpConnection()
+byte OpenPassiveTcpConnection(uint port)
 {
     byte error;
 
-    error = _OpenPassiveTcpConnection(&connection_id);
+    error = _OpenPassiveTcpConnection(&connection_id, port);
     if(error == ERR_NO_FREE_CONN)
     {
         AbortAllTransientTcpConnections();
-        error = _OpenPassiveTcpConnection(&connection_id);
+        error = _OpenPassiveTcpConnection(&connection_id, port);
     }
 
     return error;

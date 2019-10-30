@@ -20,6 +20,7 @@ static bool skipping_data;
 static int last_system_timer_value;
 static int ticks_without_data;
 static byte output_data_buffer[512];
+static int server_port;
 
 
 static void InitializeDataBuffer();
@@ -45,11 +46,13 @@ static void InitializeDataBuffer()
 }
 
 
-void InitializeHttpAutomaton(char* http_error_buffer)
+void InitializeHttpAutomaton(char* http_error_buffer, uint port)
 {
-    automaton_state = HTTPA_NONE;
+    server_port = port;
     error_buffer = http_error_buffer;
     error_buffer[0] = '\0';
+
+    automaton_state = HTTPA_NONE;
 }
 
 
@@ -83,7 +86,7 @@ static void OpenServerConnection()
 {
     byte error;
 
-    error = OpenPassiveTcpConnection();
+    error = OpenPassiveTcpConnection(server_port);
     if(error == ERR_NO_NETWORK)
     {
         sprintf(error_buffer, "No network connection");

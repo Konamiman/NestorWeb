@@ -1,6 +1,9 @@
 #include "types.h"
 
 
+#define HTTP_DEFAULT_SERVER_PORT 80
+
+
 enum HttpAutomatonStates {
     HTTPA_NONE,
     HTTPA_LISTENING,
@@ -10,5 +13,5 @@ enum HttpAutomatonStates {
 };
 
 
-void InitializeHttpAutomaton(char* http_error_buffer);
+void InitializeHttpAutomaton(char* http_error_buffer, uint port);
 void DoHttpServerAutomatonStep();
