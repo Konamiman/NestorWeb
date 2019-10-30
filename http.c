@@ -5,6 +5,7 @@
 #include "tcpip.h"
 #include "version.h"
 #include "utils.h"
+#include "msxdos.h"
 #include <string.h>
 
 
@@ -17,9 +18,15 @@ static bool skipping_data;
 static int last_system_timer_value;
 static int ticks_without_data;
 static byte output_data_buffer[512];
+static int output_data_length;
 static int server_port;
 static bool server_verbose_mode;
 static int client_inactivity_timeout;
+static char* default_document = "\\INDEX.HTM";
+static char filename_buffer[MAX_FILE_PATH_LEN*2];
+static char* files_base_directory;
+static byte file_handle;
+static fileInfoBlock file_fib;
 
 
 static void InitializeDataBuffer();
@@ -27,13 +34,20 @@ static void OpenServerConnection();
 static void HandleIncomingConnectionIfAvailable();
 static void CloseConnectionToClient();
 static void ContinueReadingRequest();
+static bool ProcessRequestLine();
 static bool ContinueReadingLine();
 static void ResetInactivityCounter();
 static void UpdateInactivityCounter();
 static void ContinueReadingHeaders();
 static void SendLineToClient(char* line);
+static void SendResponseStart(int statusCode, char* statusMessage);
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
 static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
+static char* ConvertRequestToFilename();
+static void SendNotFoundError();
+static void SendInternalError();
+static void ProcessFileRequest();
+static void ContinueSendingFile();
 
 
 #define PrintUnlessSilent(s) { if(server_verbose_mode > VERBOSE_MODE_SILENT) printf(s); }
@@ -48,15 +62,24 @@ static void InitializeDataBuffer()
 }
 
 
-void InitializeHttpAutomaton(char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks)
+void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks)
 {
     server_port = port;
     server_verbose_mode = verbose_mode;
     client_inactivity_timeout = inactivity_timeout_in_ticks;
+    files_base_directory = base_directory;
     error_buffer = http_error_buffer;
     error_buffer[0] = '\0';
 
+    file_handle = 0;
     automaton_state = HTTPA_NONE;
+}
+
+
+void CleanupHttpAutomaton()
+{
+    server_verbose_mode = VERBOSE_MODE_SILENT;
+    CloseConnectionToClient();
 }
 
 
@@ -83,6 +106,9 @@ void DoHttpServerAutomatonStep()
         case HTTPA_READING_HEADERS:
             ContinueReadingHeaders();
             break;
+        case HTTPA_SENDING_RESPONSE:
+            ContinueSendingFile();
+            break;            
     }
 }
 
@@ -115,7 +141,7 @@ static void HandleIncomingConnectionIfAvailable()
     switch(status)
     {
         case TCP_STATE_CLOSED:
-            automaton_state = HTTPA_NONE;
+            CloseConnectionToClient();
             break;
         
         case TCP_STATE_ESTABLISHED:
@@ -136,10 +162,17 @@ static void HandleIncomingConnectionIfAvailable()
 
 static void CloseConnectionToClient()
 {
-    CloseTcpConnection();
     ResetInactivityCounter();
     automaton_state = HTTPA_NONE;
-    PrintUnlessSilent("I have closed the connection with the client\r\n");
+
+    if(CloseTcpConnection())
+        PrintUnlessSilent("I have closed the connection with the client\r\n");
+
+    if(file_handle != 0)
+    {
+        CloseFile(file_handle);
+        file_handle = 0;
+    }
 }
 
 
@@ -153,14 +186,12 @@ static void ContinueReadingRequest()
     {
         case TCP_STATE_CLOSED:
             PrintUnlessSilent("Connection lost\r\n");
-
-            automaton_state = HTTPA_NONE;
+            CloseConnectionToClient();
             return;
         
         case TCP_STATE_CLOSE_WAIT:
             PrintUnlessSilent("Connection closed by client\r\n");
-            CloseTcpConnection();
-            automaton_state = HTTPA_NONE;
+            CloseConnectionToClient();
             return;
     }
 
@@ -169,26 +200,48 @@ static void ContinueReadingRequest()
     if(!lineComplete)
         return;
 
-    if(server_verbose_mode > VERBOSE_MODE_SILENT)
-        printf("Request: %s\r\n", data_buffer);
-
-    if(strlen(data_buffer) == sizeof(data_buffer)-1)
-    {
-        PrintUnlessSilent("ERROR: Request line too long, connection refused\r\n");
-        CloseTcpConnection();
-        automaton_state = HTTPA_NONE;
-        return;
-    }
-
-    if(strncmpi(data_buffer, "GET", 3))
+    if(ProcessRequestLine())
     {
         InitializeDataBuffer();
         automaton_state = HTTPA_READING_HEADERS;
     }
     else
     {
-        SendErrorResponseToClient(405, "Method Not Allowed", "Sorry, this is a GET only server for now");
         CloseConnectionToClient();
+    }
+}
+
+
+static bool ProcessRequestLine()
+{
+    char* converted_filename;
+
+    if(server_verbose_mode > VERBOSE_MODE_SILENT)
+        printf("Request: %s\r\n", data_buffer);
+
+    if(strlen(data_buffer) == sizeof(data_buffer)-1)
+    {
+        PrintUnlessSilent("ERROR: Request line too long, connection refused\r\n");
+        return false;
+    }
+
+    if(!strncmpi(data_buffer, "GET", 3))
+    {
+        SendErrorResponseToClient(405, "Method Not Allowed", "Sorry, this is a GET only server for now");
+        return false;
+    }
+
+    converted_filename = ConvertRequestToFilename();
+    if(converted_filename)
+    {
+        strcpy(filename_buffer, files_base_directory);
+        strcat(filename_buffer, converted_filename);
+        return true;
+    }
+    else
+    {
+        SendNotFoundError();
+        return false;
     }
 }
 
@@ -281,8 +334,7 @@ static void ContinueReadingHeaders()
     }
     else
     {
-        SendErrorResponseToClient(404, "Not Found", "Please be patient, we're still setting up stuff here!");
-        CloseConnectionToClient();
+        ProcessFileRequest();
     }
 }
 
@@ -297,7 +349,7 @@ static void SendLineToClient(char* line)
 }
 
 
-static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content)
+static void SendResponseStart(int statusCode, char* statusMessage)
 {
     char buffer[64];
 
@@ -306,7 +358,16 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
 
     sprintf(buffer, "HTTP/1.1 %i %s", statusCode, statusMessage);
     SendLineToClient(buffer);
+    SendLineToClient("Connection: close");
     SendLineToClient("X-Powered-By: NestorHTTP/" VERSION "; MSX-DOS");
+}
+
+
+static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content)
+{
+    char buffer[64];
+
+    SendResponseStart(statusCode, statusMessage);
     sprintf(buffer, "Content-Length: %i", content ? strlen(content) : 0);
     SendLineToClient(buffer);
     if(content)
@@ -351,4 +412,164 @@ static void SendErrorResponseToClient(int statusCode, char* statusMessage, char*
         );
     
     SendHtmlResponseToClient(statusCode, statusMessage, output_data_buffer);
+}
+
+
+static char* ConvertRequestToFilename()
+{
+    char* pointer;
+    char* start_pointer;
+    char ch;
+    bool last_char_was_dot;
+
+    pointer = data_buffer;
+
+    //Skip the method and the initial "/"
+    while(*pointer != ' ') pointer++;
+    while(*pointer == ' ') pointer++;
+    if(*pointer == '/') pointer++;
+
+    start_pointer = pointer;
+
+    last_char_was_dot = false;
+    while((ch = *pointer) > ' ' && ch != QUERY_STRING_SEPARATOR)
+    {
+        if(ch == '/')
+        {
+            *pointer = '\\';
+        }
+        else if(ch == '.')
+        {
+            //Don't allow ".." to prevent access to outside the base directory
+            if(last_char_was_dot)
+                return null;
+            
+            last_char_was_dot = true;
+        }
+        else
+        {
+            last_char_was_dot = false;
+        }
+        
+        pointer++;
+    }
+
+    if(pointer[-1] == '\\')
+        pointer--;
+
+    *pointer = '\0';
+    return start_pointer == pointer ? default_document+1 : start_pointer;
+}
+
+
+static void SendNotFoundError()
+{
+    SendErrorResponseToClient(404, "Not Found", "The requested resource was not found in this server");
+}
+
+
+static void SendInternalError()
+{
+    SendErrorResponseToClient(500, "Internal Server Error", "Sorry, something went wrong. It's not you, it's me.");
+}
+
+
+static void ProcessFileRequest()
+{
+    byte error;
+    byte buffer[64];
+
+    error = SearchFile(filename_buffer, &file_fib, true);
+    if(error == ERR_NOFIL)
+    {
+        SendNotFoundError();
+        CloseConnectionToClient();
+        return;
+    }
+    else if(error == 0 && (file_fib.attributes & FILE_ATTR_DIRECTORY))
+    {
+        strcat(filename_buffer, default_document);
+        error = SearchFile(filename_buffer, &file_fib, false);
+        if(error == ERR_NOFIL)
+        {
+            SendNotFoundError();
+            CloseConnectionToClient();
+            return;
+        }
+    }
+    
+    if(error >= MIN_DISK_ERROR_CODE || error == ERR_NHAND || error == ERR_NORAM)
+    {
+        if(server_verbose_mode > VERBOSE_MODE_SILENT)
+            printf("*** Error searching file: %i\r\n", error);
+
+        SendInternalError();
+        CloseConnectionToClient();
+        return;
+    }
+    else if(error != 0)
+    {
+        SendErrorResponseToClient(400, "Bad Request", "Sorry, I'm not able to process your request.");
+        CloseConnectionToClient();
+        return;
+    }
+
+    error = OpenFile(&file_fib, &file_handle);
+    if(error)
+    {
+        if(server_verbose_mode > VERBOSE_MODE_SILENT)
+            printf("*** Error opening file: %i\r\n", error);
+
+        SendInternalError();
+        CloseConnectionToClient();
+    }
+
+    SendResponseStart(200, "Ok");
+    sprintf(buffer, "Content-Length: %i", file_fib.fileSize);
+    SendLineToClient(buffer);
+    SendLineToClient("");
+
+    output_data_length = 0;
+    automaton_state = HTTPA_SENDING_RESPONSE;
+}
+
+
+static void ContinueSendingFile()
+{
+    byte error;
+
+    while(true)
+    {
+        if(GetSimplifiedTcpConnectionState() == TCP_STATE_CLOSED)
+        {
+            PrintUnlessSilent("Connection lost\r\n");
+            CloseConnectionToClient();
+            return;
+        }
+
+        if(output_data_length == 0)
+        {
+            output_data_length = sizeof(output_data_buffer);
+            error = ReadFromFile(file_handle, output_data_buffer, &output_data_length);
+            if(error == ERR_EOF)
+            {
+                CloseConnectionToClient();
+                return;
+            }
+            else if(error != 0)
+            {
+                if(server_verbose_mode > VERBOSE_MODE_SILENT)
+                    printf("*** Error reading file: %i\r\n", error);
+
+                SendInternalError();
+                CloseConnectionToClient();
+                return;
+            }
+        }
+
+        if(SendDataToTcpConnection(output_data_buffer, output_data_length))
+            output_data_length = 0;
+        else
+            return;
+    }
 }

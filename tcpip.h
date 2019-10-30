@@ -68,7 +68,7 @@ void LetTcpipBreathe();
 void AbortAllTransientTcpConnections();
 byte OpenPassiveTcpConnection(uint port);
 byte GetSimplifiedTcpConnectionState();
-void CloseTcpConnection();
+bool CloseTcpConnection();
 bool EnsureIncomingTcpDataIsAvailable();
 byte GetIncomingTcpByte();
 bool SendDataToTcpConnection(byte* data, int length);

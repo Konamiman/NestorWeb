@@ -84,3 +84,43 @@ bool KeyIsPressed()
     DosCall(F_DIRIO, &regs, REGS_MAIN, REGS_MAIN);
     return regs.Bytes.A != 0;
 }
+
+
+byte SearchFile(char* fileName, fileInfoBlock* fib, bool include_dirs)
+{
+    regs.Words.DE = (int)fileName;
+    regs.Bytes.B = include_dirs ? FILE_ATTR_DIRECTORY : 0;
+    regs.Words.IX = (int)fib;
+    DosCall(F_FFIRST, &regs, REGS_ALL, REGS_MAIN);
+    return regs.Bytes.A;
+}
+
+
+byte OpenFile(void* path_or_fib, byte* file_handle)
+{
+    regs.Words.DE = (int)path_or_fib;
+    regs.Bytes.A = 0;
+    DosCall(F_OPEN, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A == 0)
+        *file_handle = regs.Bytes.B;
+    
+    return regs.Bytes.A;
+}
+
+
+byte ReadFromFile(byte file_handle, byte* destination, int* length)
+{
+    regs.Bytes.B = file_handle;
+    regs.Words.DE = (int)destination;
+    regs.Words.HL = *length;
+    DosCall(F_READ, &regs, REGS_MAIN, REGS_MAIN);
+    *length = regs.Words.HL;
+    return regs.Bytes.A;
+}
+
+
+void CloseFile(byte file_handle)
+{
+    regs.Bytes.B = file_handle;
+    DosCall(F_READ, &regs, REGS_MAIN, REGS_NONE);
+}

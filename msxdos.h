@@ -191,6 +191,12 @@
 #define ERR_INSDSK 0x7F
 #define ERR_PRAK   0x7E
 
+#define MIN_DISK_ERROR_CODE 0xF0
+
+// File attributes
+
+#define FILE_ATTR_DIRECTORY (1 << 4)
+
 // Data structures
 
 typedef struct {

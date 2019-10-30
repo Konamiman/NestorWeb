@@ -18,7 +18,9 @@ const char* strHelp =
     "p: Server port number, 1-" MAX_USABLE_TCP_PORT_STR ", default is 80\r\n"
     "v: Verbosity mode:\r\n"
     "   0: silent, 1: show connections and errors (default), 2: show all headers\r\n"
-    "t: Inactivity timeout for client connections in seconds, default is " DEFAULT_INACTIVITY_TIMEOUT_SECS_STR
+    "t: Inactivity timeout for client connections in seconds, default is " DEFAULT_INACTIVITY_TIMEOUT_SECS_STR "\r\n"
+    "\r\n"
+    "A request for '/' or for a directory will serve INDEX.HTM file if it exists.\r\n"
     "\r\n";
 
 char base_directory[64];
@@ -129,7 +131,7 @@ void Initialize()
     printf("Listening on %i.%i.%i.%i:%u\r\n", buffer[0], buffer[1], buffer[2], buffer[3], port);
     printf("Press any key to exit\r\n\r\n");
 
-    InitializeHttpAutomaton(http_error_buffer, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND);
+    InitializeHttpAutomaton(base_directory, http_error_buffer, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND);
 }
 
 
@@ -142,5 +144,6 @@ void TerminateWithErrorMessage(char* message)
 
 void Cleanup()
 {
+    CleanupHttpAutomaton();
     AbortAllTransientTcpConnections();
 }
