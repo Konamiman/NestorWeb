@@ -317,6 +317,10 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
             printf("--> (HTML response)\r\n");
         SendStringToTcpConnection(content);
     }
+    else
+    {
+        SendLineToClient("");
+    }
 }
 
 
@@ -332,6 +336,7 @@ static void SendErrorResponseToClient(int statusCode, char* statusMessage, char*
         output_data_buffer,
             "<html>"
             "<head>"
+            "<title>NestorHTTP - error</title>"
             "<style type='text/css'>body {font-family: sans-serif;} .footer {font-size: small; color: gray; font-style: italic;}</style>"
             "</head>"
             "<body>"
