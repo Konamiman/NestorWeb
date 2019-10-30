@@ -22,11 +22,16 @@ static int output_data_length;
 static int server_port;
 static bool server_verbose_mode;
 static int client_inactivity_timeout;
-static char* default_document = "\\INDEX.HTM";
 static char filename_buffer[MAX_FILE_PATH_LEN*2];
 static char* files_base_directory;
 static byte file_handle;
 static fileInfoBlock file_fib;
+static bool send_as_attachment;
+
+static char* default_document = "\\INDEX.HTM";
+static char* content_length_str = "Content-Length: %i";
+static char* connection_lost_str = "Connection lost\r\n";
+static char* connection_closed_by_client_str = "Connection closed by client\r\n";
 
 
 static void InitializeDataBuffer();
@@ -43,7 +48,7 @@ static void SendLineToClient(char* line);
 static void SendResponseStart(int statusCode, char* statusMessage);
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
 static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
-static char* ConvertRequestToFilename();
+static char* ConvertRequestToFilename(char** query_string_start);
 static void SendNotFoundError();
 static void SendInternalError();
 static void ProcessFileRequest();
@@ -185,12 +190,12 @@ static void ContinueReadingRequest()
     switch(status)
     {
         case TCP_STATE_CLOSED:
-            PrintUnlessSilent("Connection lost\r\n");
+            PrintUnlessSilent(connection_lost_str);
             CloseConnectionToClient();
             return;
         
         case TCP_STATE_CLOSE_WAIT:
-            PrintUnlessSilent("Connection closed by client\r\n");
+            PrintUnlessSilent(connection_closed_by_client_str);
             CloseConnectionToClient();
             return;
     }
@@ -215,6 +220,7 @@ static void ContinueReadingRequest()
 static bool ProcessRequestLine()
 {
     char* converted_filename;
+    char* query_string;
 
     if(server_verbose_mode > VERBOSE_MODE_SILENT)
         printf("Request: %s\r\n", data_buffer);
@@ -231,7 +237,9 @@ static bool ProcessRequestLine()
         return false;
     }
 
-    converted_filename = ConvertRequestToFilename();
+    converted_filename = ConvertRequestToFilename(&query_string);
+    send_as_attachment = query_string && strncmpi(query_string, "a=1", 3);
+
     if(converted_filename)
     {
         strcpy(filename_buffer, files_base_directory);
@@ -310,12 +318,12 @@ static void ContinueReadingHeaders()
     switch(status)
     {
         case TCP_STATE_CLOSED:
-            PrintUnlessSilent("Connection lost\r\n");
+            PrintUnlessSilent(connection_lost_str);
             automaton_state = HTTPA_NONE;
             return;
         
         case TCP_STATE_CLOSE_WAIT:
-            PrintUnlessSilent("Connection closed by client\r\n");
+            PrintUnlessSilent(connection_closed_by_client_str);
             CloseTcpConnection();
             automaton_state = HTTPA_NONE;
             return;
@@ -368,7 +376,7 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
     char buffer[64];
 
     SendResponseStart(statusCode, statusMessage);
-    sprintf(buffer, "Content-Length: %i", content ? strlen(content) : 0);
+    sprintf(buffer, content_length_str, content ? strlen(content) : 0);
     SendLineToClient(buffer);
     if(content)
     {
@@ -415,7 +423,7 @@ static void SendErrorResponseToClient(int statusCode, char* statusMessage, char*
 }
 
 
-static char* ConvertRequestToFilename()
+static char* ConvertRequestToFilename(char** query_string_start)
 {
     char* pointer;
     char* start_pointer;
@@ -423,6 +431,7 @@ static char* ConvertRequestToFilename()
     bool last_char_was_dot;
 
     pointer = data_buffer;
+    *query_string_start = null;
 
     //Skip the method and the initial "/"
     while(*pointer != ' ') pointer++;
@@ -453,6 +462,9 @@ static char* ConvertRequestToFilename()
         
         pointer++;
     }
+
+    if(ch == QUERY_STRING_SEPARATOR)
+        *query_string_start = pointer+1;
 
     if(pointer[-1] == '\\')
         pointer--;
@@ -525,8 +537,13 @@ static void ProcessFileRequest()
     }
 
     SendResponseStart(200, "Ok");
-    sprintf(buffer, "Content-Length: %i", file_fib.fileSize);
+    sprintf(buffer, content_length_str, file_fib.fileSize);
     SendLineToClient(buffer);
+    if(send_as_attachment)
+    {
+        sprintf(buffer, "Content-Disposition: attachment; filename=\"%s\"", file_fib.filename);
+        SendLineToClient(buffer);
+    }
     SendLineToClient("");
 
     output_data_length = 0;
@@ -538,11 +555,11 @@ static void ContinueSendingFile()
 {
     byte error;
 
-    while(true)
+    while(true) //Continue while there's more data to send AND the TCP connection has room for more output data
     {
         if(GetSimplifiedTcpConnectionState() == TCP_STATE_CLOSED)
         {
-            PrintUnlessSilent("Connection lost\r\n");
+            PrintUnlessSilent(connection_lost_str);
             CloseConnectionToClient();
             return;
         }

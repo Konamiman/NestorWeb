@@ -20,7 +20,9 @@ const char* strHelp =
     "   0: silent, 1: show connections and errors (default), 2: show all headers\r\n"
     "t: Inactivity timeout for client connections in seconds, default is " DEFAULT_INACTIVITY_TIMEOUT_SECS_STR "\r\n"
     "\r\n"
-    "A request for '/' or for a directory will serve INDEX.HTM file if it exists.\r\n"
+    "A request for \"/\" or for a directory will serve INDEX.HTM file if it exists.\r\n"
+    "\r\n"
+    "Files are sent as attachments if \"?a=1\" is added to the request.\r\n"
     "\r\n";
 
 char base_directory[64];
