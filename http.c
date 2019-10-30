@@ -8,9 +8,6 @@
 #include <string.h>
 
 
-#define MAX_SECONDS_WITHOUT_DATA 5
-
-
 static byte automaton_state;
 static char* error_buffer;
 static byte data_buffer[256+1];
@@ -22,6 +19,7 @@ static int ticks_without_data;
 static byte output_data_buffer[512];
 static int server_port;
 static bool server_verbose_mode;
+static int client_inactivity_timeout;
 
 
 static void InitializeDataBuffer();
@@ -50,10 +48,11 @@ static void InitializeDataBuffer()
 }
 
 
-void InitializeHttpAutomaton(char* http_error_buffer, uint port, byte verbose_mode)
+void InitializeHttpAutomaton(char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks)
 {
     server_port = port;
     server_verbose_mode = verbose_mode;
+    client_inactivity_timeout = inactivity_timeout_in_ticks;
     error_buffer = http_error_buffer;
     error_buffer[0] = '\0';
 
@@ -63,7 +62,7 @@ void InitializeHttpAutomaton(char* http_error_buffer, uint port, byte verbose_mo
 
 void DoHttpServerAutomatonStep()
 {
-    if(ticks_without_data >= MAX_SECONDS_WITHOUT_DATA * 50)
+    if(ticks_without_data >= client_inactivity_timeout)
     {
         PrintUnlessSilent("Closing connection for client inactivity\r\n");
 

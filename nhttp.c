@@ -13,17 +13,19 @@ const char* strTitle =
     "\r\n";
 
 const char* strHelp =
-    "Usage: NHTTP <base directory> [p=<port>] [v=0|1|2]\r\n"
+    "Usage: NHTTP <base directory> [p=<port>] [v=0|1|2] [t=<timeout>]\r\n"
     "\r\n"
     "<port>: Server port number, 1-" MAX_USABLE_TCP_PORT_STR ", default is 80\r\n"
     "v: Verbosity mode:\r\n"
     "   0: silent, 1: show connections and errors (default), 2: show all headers\r\n"
+    "t: Inactivity timeout for client connections in seconds, default is " DEFAULT_INACTIVITY_TIMEOUT_SECS_STR
     "\r\n";
 
 char base_directory[64];
 char http_error_buffer[80];
 uint port;
 int verbose_mode;
+int inactivity_timeout;
 
 
 void ProcessArguments(char** argv, int argc);
@@ -78,6 +80,7 @@ void ProcessArguments(char** argv, int argc)
 
     port = HTTP_DEFAULT_SERVER_PORT;
     verbose_mode = VERBOSE_MODE_CONNECTIONS;
+    inactivity_timeout = DEFAULT_INACTIVITY_TIMEOUT_SECS;
 
     for(i = 1; i<argc; i++)
     {
@@ -91,6 +94,12 @@ void ProcessArguments(char** argv, int argc)
         else if(c == 'v')
         {
             verbose_mode = ((byte)argv[i][2]-'0');
+        }
+        else if(c == 't')
+        {
+            inactivity_timeout = (uint)atoi(&argv[i][2]);
+            if(inactivity_timeout == 0)
+                TerminateWithErrorMessage("Inactivity timeout must be at least 1");
         }
         else
         {
@@ -120,7 +129,7 @@ void Initialize()
     printf("Listening on %i.%i.%i.%i:%u\r\n", buffer[0], buffer[1], buffer[2], buffer[3], port);
     printf("Press any key to exit\r\n\r\n");
 
-    InitializeHttpAutomaton(http_error_buffer, port, verbose_mode);
+    InitializeHttpAutomaton(http_error_buffer, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND);
 }
 
 
