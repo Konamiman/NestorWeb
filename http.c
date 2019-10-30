@@ -21,6 +21,7 @@ static int last_system_timer_value;
 static int ticks_without_data;
 static byte output_data_buffer[512];
 static int server_port;
+static bool server_verbose_mode;
 
 
 static void InitializeDataBuffer();
@@ -37,6 +38,9 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
 static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
 
 
+#define PrintUnlessSilent(s) { if(server_verbose_mode > VERBOSE_MODE_SILENT) printf(s); }
+
+
 static void InitializeDataBuffer()
 {
     data_buffer_pointer = data_buffer; 
@@ -46,9 +50,10 @@ static void InitializeDataBuffer()
 }
 
 
-void InitializeHttpAutomaton(char* http_error_buffer, uint port)
+void InitializeHttpAutomaton(char* http_error_buffer, uint port, byte verbose_mode)
 {
     server_port = port;
+    server_verbose_mode = verbose_mode;
     error_buffer = http_error_buffer;
     error_buffer[0] = '\0';
 
@@ -60,7 +65,8 @@ void DoHttpServerAutomatonStep()
 {
     if(ticks_without_data >= MAX_SECONDS_WITHOUT_DATA * 50)
     {
-        printf("Closing connection for client inactivity\r\n");
+        PrintUnlessSilent("Closing connection for client inactivity\r\n");
+
         CloseConnectionToClient();
     }
 
@@ -114,7 +120,8 @@ static void HandleIncomingConnectionIfAvailable()
             break;
         
         case TCP_STATE_ESTABLISHED:
-            printf("Connection received!\r\n");
+            PrintUnlessSilent("Connection received!\r\n");
+
             InitializeDataBuffer();
             automaton_state = HTTPA_READING_REQUEST;
             break;
@@ -133,7 +140,7 @@ static void CloseConnectionToClient()
     CloseTcpConnection();
     ResetInactivityCounter();
     automaton_state = HTTPA_NONE;
-    printf("I have closed the connection with the client\r\n");
+    PrintUnlessSilent("I have closed the connection with the client\r\n");
 }
 
 
@@ -146,12 +153,13 @@ static void ContinueReadingRequest()
     switch(status)
     {
         case TCP_STATE_CLOSED:
-            printf("Connection lost\r\n");
+            PrintUnlessSilent("Connection lost\r\n");
+
             automaton_state = HTTPA_NONE;
             return;
         
         case TCP_STATE_CLOSE_WAIT:
-            printf("Connection closed by client\r\n");
+            PrintUnlessSilent("Connection closed by client\r\n");
             CloseTcpConnection();
             automaton_state = HTTPA_NONE;
             return;
@@ -162,10 +170,12 @@ static void ContinueReadingRequest()
     if(!lineComplete)
         return;
 
-    printf("<-- %s\r\n", data_buffer);
+    if(server_verbose_mode > VERBOSE_MODE_SILENT)
+        printf("Request: %s\r\n", data_buffer);
+
     if(strlen(data_buffer) == sizeof(data_buffer)-1)
     {
-        printf("ERROR: Request line too long, connection refused\r\n");
+        PrintUnlessSilent("ERROR: Request line too long, connection refused\r\n");
         CloseTcpConnection();
         automaton_state = HTTPA_NONE;
         return;
@@ -206,7 +216,7 @@ static bool ContinueReadingLine()
                 if(data_buffer_length >= sizeof(data_buffer)-1)
                 {
                     skipping_data = true;
-                    printf("* WARNING: Line too long, truncating\r\n");
+                    PrintUnlessSilent("* WARNING: Line too long, truncating\r\n");
                 }
             }
 
@@ -248,12 +258,12 @@ static void ContinueReadingHeaders()
     switch(status)
     {
         case TCP_STATE_CLOSED:
-            printf("Connection lost\r\n");
+            PrintUnlessSilent("Connection lost\r\n");
             automaton_state = HTTPA_NONE;
             return;
         
         case TCP_STATE_CLOSE_WAIT:
-            printf("Connection closed by client\r\n");
+            PrintUnlessSilent("Connection closed by client\r\n");
             CloseTcpConnection();
             automaton_state = HTTPA_NONE;
             return;
@@ -265,7 +275,9 @@ static void ContinueReadingHeaders()
 
     if(data_buffer_length > 0)
     {
-        printf("<-- %s\r\n", data_buffer);
+        if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
+            printf("<-- %s\r\n", data_buffer);
+
         InitializeDataBuffer();
     }
     else
@@ -279,7 +291,9 @@ static void ContinueReadingHeaders()
 static void SendLineToClient(char* line)
 {
     sprintf(data_buffer, "%s\r\n", line);
-    printf("--> %s", data_buffer);
+    if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
+        printf("--> %s", data_buffer);
+
     SendStringToTcpConnection(data_buffer);
 }
 
@@ -287,6 +301,9 @@ static void SendLineToClient(char* line)
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content)
 {
     char buffer[64];
+
+    if(server_verbose_mode > VERBOSE_MODE_SILENT)
+        printf("Response: %i %s\r\n", statusCode, statusMessage);
 
     sprintf(buffer, "HTTP/1.1 %i %s", statusCode, statusMessage);
     SendLineToClient(buffer);
@@ -297,7 +314,8 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
     {
         SendLineToClient("Content-Type: text/html");
         SendLineToClient("");
-        printf("--> (response)\r\n");
+        if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
+            printf("--> (HTML response)\r\n");
         SendStringToTcpConnection(content);
     }
 }

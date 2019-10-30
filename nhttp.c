@@ -13,14 +13,17 @@ const char* strTitle =
     "\r\n";
 
 const char* strHelp =
-    "Usage: NHTTP <base directory> [p=<port>]\r\n"
+    "Usage: NHTTP <base directory> [p=<port>] [v=0|1|2]\r\n"
     "\r\n"
     "<port>: Server port number, 1-" MAX_USABLE_TCP_PORT_STR ", default is 80\r\n"
+    "v: Verbosity mode:\r\n"
+    "   0: silent, 1: show connections and errors (default), 2: show all headers\r\n"
     "\r\n";
 
 char base_directory[64];
 char http_error_buffer[80];
 uint port;
+int verbose_mode;
 
 
 void ProcessArguments(char** argv, int argc);
@@ -74,6 +77,8 @@ void ProcessArguments(char** argv, int argc)
         TerminateWithErrorCode(error);
 
     port = HTTP_DEFAULT_SERVER_PORT;
+    verbose_mode = VERBOSE_MODE_CONNECTIONS;
+
     for(i = 1; i<argc; i++)
     {
         c = ToLower(argv[i][0]);
@@ -82,6 +87,10 @@ void ProcessArguments(char** argv, int argc)
             port = (uint)atoi(&argv[i][2]);
             if(port == 0 || port > MAX_USABLE_TCP_PORT)
                 TerminateWithErrorMessage("Port number must be between 1 and " MAX_USABLE_TCP_PORT_STR);
+        }
+        else if(c == 'v')
+        {
+            verbose_mode = ((byte)argv[i][2]-'0');
         }
         else
         {
@@ -111,7 +120,7 @@ void Initialize()
     printf("Listening on %i.%i.%i.%i:%u\r\n", buffer[0], buffer[1], buffer[2], buffer[3], port);
     printf("Press any key to exit\r\n\r\n");
 
-    InitializeHttpAutomaton(http_error_buffer, port);
+    InitializeHttpAutomaton(http_error_buffer, port, verbose_mode);
 }
 
 

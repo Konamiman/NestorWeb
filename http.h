@@ -3,6 +3,10 @@
 
 #define HTTP_DEFAULT_SERVER_PORT 80
 
+#define VERBOSE_MODE_SILENT 0
+#define VERBOSE_MODE_CONNECTIONS 1
+#define VERBOSE_MODE_ALL 2
+
 
 enum HttpAutomatonStates {
     HTTPA_NONE,
@@ -13,5 +17,5 @@ enum HttpAutomatonStates {
 };
 
 
-void InitializeHttpAutomaton(char* http_error_buffer, uint port);
+void InitializeHttpAutomaton(char* http_error_buffer, uint port, byte verbose_mode);
 void DoHttpServerAutomatonStep();
