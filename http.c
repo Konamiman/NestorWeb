@@ -517,7 +517,7 @@ static void ProcessFileRequest()
     dateTime date_time;
 
     error = SearchFile(filename_buffer, &file_fib, true);
-    if(error == ERR_NOFIL)
+    if(error == ERR_NOFIL || error == ERR_NODIR)
     {
         SendNotFoundError();
         CloseConnectionToClient();
