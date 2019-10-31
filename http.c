@@ -29,9 +29,10 @@ static fileInfoBlock file_fib;
 static bool send_as_attachment;
 static bool has_if_modified_since;
 static dateTime if_modified_since_date;
+static char num_buffer[11];
+static char content_length_buffer[32];
 
 static char* default_document = "\\INDEX.HTM";
-static char* content_length_str = "Content-Length: %i";
 static char* connection_lost_str = "Connection lost\r\n";
 static char* connection_closed_by_client_str = "Connection closed by client\r\n";
 
@@ -55,8 +56,9 @@ static char* ConvertRequestToFilename(char** query_string_start);
 static void SendNotFoundError();
 static void SendInternalError();
 static void ProcessFileRequest();
+static void SendContentLengthHeader(ulong length);
 static void ContinueSendingFile();
-
+extern void _ultoa(long val, char* buffer, char base);
 
 #define PrintUnlessSilent(s) { if(server_verbose_mode > VERBOSE_MODE_SILENT) printf(s); }
 
@@ -382,7 +384,7 @@ static void SendResponseStart(int statusCode, char* statusMessage)
     sprintf(buffer, "HTTP/1.1 %i %s", statusCode, statusMessage);
     SendLineToClient(buffer);
     SendLineToClient("Connection: close");
-    SendLineToClient("X-Powered-By: NestorHTTP/" VERSION "; MSX-DOS");
+    SendLineToClient("Server: NestorHTTP/" VERSION " (MSX-DOS)");
 }
 
 
@@ -397,8 +399,7 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
         return;
     }
 
-    sprintf(buffer, content_length_str, content ? strlen(content) : 0);
-    SendLineToClient(buffer);
+    SendContentLengthHeader(content ? strlen(content) : 0);
 
     if(content)
     {
@@ -573,9 +574,7 @@ static void ProcessFileRequest()
     }
 
     SendResponseStart(200, "Ok");
-    
-    sprintf(buffer, content_length_str, file_fib.fileSize);
-    SendLineToClient(buffer);
+    SendContentLengthHeader(file_fib.fileSize);
     
     if(send_as_attachment)
     {
@@ -595,6 +594,14 @@ static void ProcessFileRequest()
 
     output_data_length = 0;
     automaton_state = HTTPA_SENDING_RESPONSE;
+}
+
+
+static void SendContentLengthHeader(ulong length)
+{
+    _ultoa(length, num_buffer, 10);
+    sprintf(content_length_buffer, "Content-Length: %s", num_buffer);
+    SendLineToClient(content_length_buffer);
 }
 
 
