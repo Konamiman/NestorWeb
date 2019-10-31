@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "msxdos.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 static const char* week_days[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 static const char* months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -75,3 +76,72 @@ void ParseFibDateTime(fileInfoBlock* fib, dateTime* date_time)
     date_time->second = (fib->timeOfModification & 0x1F) * 2;
 }
 
+
+bool ParseVerboseDateTime(char* string, dateTime* date_time)
+{
+    //Wed, 21 Oct 2015 07:28:00 GMT 
+    //012345678901234567890123
+    //          11111111112222
+
+    int temp;
+
+    while(*string == ' ') string++;
+
+    temp = atoi(&string[5]);
+    if(temp == 0 || temp > 31) return false;
+    date_time->day = (byte)temp;
+
+    temp = 0;
+    while(true)
+    {
+        if(strncmpi(&string[8], months[temp], 3))
+        {
+            date_time->month = temp+1;
+            break;
+        }
+        else if(temp == 12)
+            return false;
+        
+        temp++;
+    }
+
+    temp = atoi(&string[12]);
+    if(temp < 1980) return false;
+    date_time->year = temp;
+
+    temp = atoi(&string[17]);
+    if(temp > 23) return false;
+    date_time->hour = (byte)temp;
+
+    temp = atoi(&string[20]);
+    if(temp > 59) return false;
+    date_time->minute = (byte)temp;
+
+    temp = atoi(&string[23]);
+    if(temp > 59) return false;
+    date_time->second = (byte)temp;
+
+    return true;
+}
+
+
+// <0 if dt1<dt2, 0 if dt1==dt2, >0 if dt1>dt2
+int CompareDates(dateTime* dt1, dateTime* dt2)
+{
+    if(dt1->year != dt2->year)
+        return dt1->year - dt2->year;
+    
+    if(dt1->month != dt2->month)
+        return dt1->month - dt2->month;
+
+    if(dt1->day != dt2->day)
+        return dt1->day - dt2->day;
+
+    if(dt1->hour != dt2->hour)
+        return dt1->hour - dt2->hour;
+    
+    if(dt1->minute != dt2->minute)
+        return dt1->minute - dt2->minute;
+
+    return dt1->second - dt2->second;
+}

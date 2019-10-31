@@ -27,6 +27,8 @@ static char* files_base_directory;
 static byte file_handle;
 static fileInfoBlock file_fib;
 static bool send_as_attachment;
+static bool has_if_modified_since;
+static dateTime if_modified_since_date;
 
 static char* default_document = "\\INDEX.HTM";
 static char* content_length_str = "Content-Length: %i";
@@ -44,6 +46,7 @@ static bool ContinueReadingLine();
 static void ResetInactivityCounter();
 static void UpdateInactivityCounter();
 static void ContinueReadingHeaders();
+static void ProcessHeader();
 static void SendLineToClient(char* line);
 static void SendResponseStart(int statusCode, char* statusMessage);
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
@@ -178,6 +181,8 @@ static void CloseConnectionToClient()
         CloseFile(file_handle);
         file_handle = 0;
     }
+
+    has_if_modified_since = false;
 }
 
 
@@ -338,11 +343,21 @@ static void ContinueReadingHeaders()
         if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
             printf("<-- %s\r\n", data_buffer);
 
+        ProcessHeader();
         InitializeDataBuffer();
     }
     else
     {
         ProcessFileRequest();
+    }
+}
+
+
+static void ProcessHeader()
+{
+    if(strncmpi(data_buffer, "If-Modified-Since:", 18))
+    {
+        has_if_modified_since = ParseVerboseDateTime(&data_buffer[18], &if_modified_since_date);
     }
 }
 
@@ -376,8 +391,15 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
     char buffer[64];
 
     SendResponseStart(statusCode, statusMessage);
+    if(statusCode > 300 && statusCode < 400)
+    {
+        SendLineToClient("");
+        return;
+    }
+
     sprintf(buffer, content_length_str, content ? strlen(content) : 0);
     SendLineToClient(buffer);
+
     if(content)
     {
         SendLineToClient("Content-Type: text/html");
@@ -528,6 +550,18 @@ static void ProcessFileRequest()
         return;
     }
 
+    if(file_fib.dateOfModification != 0)
+    {
+        ParseFibDateTime(&file_fib, &date_time);
+
+        if(has_if_modified_since && CompareDates(&date_time, &if_modified_since_date) <= 0)
+        {
+            SendErrorResponseToClient(304, "Not Modified", null);
+            CloseConnectionToClient();
+            return;
+        }
+    }
+
     error = OpenFile(&file_fib, &file_handle);
     if(error)
     {
@@ -551,7 +585,7 @@ static void ProcessFileRequest()
 
     if(file_fib.dateOfModification != 0)
     {
-        ParseFibDateTime(&file_fib, &date_time);
+        //Note that we already ran ParseFibDateTime earlier
         ToVerboseDate(buffer2, &date_time);
         sprintf(buffer, "Last-Modified: %s", buffer2);
         SendLineToClient(buffer);
