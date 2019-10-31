@@ -593,6 +593,7 @@ static void ProcessFileRequest()
     SendLineToClient("");
 
     output_data_length = 0;
+    PrintUnlessSilent("Sending file contents...\r\n");
     automaton_state = HTTPA_SENDING_RESPONSE;
 }
 
