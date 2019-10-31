@@ -7,7 +7,7 @@
 
 
 static Z80_registers regs;
-fileInfoBlock fib;
+static fileInfoBlock fib;
 
 
 bool MsxDos2IsRunning()
