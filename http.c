@@ -571,6 +571,7 @@ static void ProcessFileRequest()
 
         SendInternalError();
         CloseConnectionToClient();
+        return;
     }
 
     SendResponseStart(200, "Ok");
