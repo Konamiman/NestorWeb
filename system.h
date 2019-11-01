@@ -19,5 +19,6 @@ byte SearchFile(char* fileName, fileInfoBlock* fib, bool include_dirs);
 byte OpenFile(void* path_or_fib, byte* file_handle);
 byte ReadFromFile(byte file_handle, byte* destination, int* length);
 void CloseFile(byte file_handle);
+void DisableDiskErrorPrompt();
 
 #endif

@@ -124,3 +124,42 @@ void CloseFile(byte file_handle)
     regs.Bytes.B = file_handle;
     DosCall(F_READ, &regs, REGS_MAIN, REGS_NONE);
 }
+
+
+// This prevents disk errors from triggering an "Abort, Retry, Ignore?" prompt,
+// which wouldn't be a nice behavior for a server.
+void DisableDiskErrorPrompt() __naked
+{
+    __asm
+    
+    push    ix
+    ld de,#DSKERR_CODE
+    ld c,#F_DEFER
+    call    #5
+    ld  de,#ABORT_CODE
+    ld  c,#F_DEFAB
+    call    #5
+    pop ix
+    ret
+
+    ;--- Disk error handling routine
+DSKERR_CODE:
+    ld a,#1  ;Always return "Abort"
+    ret
+
+    ;--- Program termination handling routine
+ABORT_CODE:
+    ld c,a
+    cp #ERR_ABORT
+    ld a,c
+    ret nz ;Not a disk error abort -> the program is willingfully terminating
+
+    ;This causes execution to return to the caller of the DOS function call,
+    ;instead of continuing to the termination of the program
+    pop hl
+
+    ld a,b  ;For ERR_ABORT, B contains the actual disk error code
+    ret
+
+    __endasm;
+}

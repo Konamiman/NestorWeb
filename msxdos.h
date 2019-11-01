@@ -191,6 +191,7 @@
 #define ERR_INSDSK 0x7F
 #define ERR_PRAK   0x7E
 
+// Disk errors are those that trigger an "Abort, Retry, Ignore?" prompt by default
 #define MIN_DISK_ERROR_CODE 0xF0
 
 // File attributes

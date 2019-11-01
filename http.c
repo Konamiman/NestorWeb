@@ -538,7 +538,7 @@ static void ProcessFileRequest()
     if(error >= MIN_DISK_ERROR_CODE || error == ERR_NHAND || error == ERR_NORAM)
     {
         if(server_verbose_mode > VERBOSE_MODE_SILENT)
-            printf("*** Error searching file: %i\r\n", error);
+            printf("*** Error searching file: %xh\r\n", error);
 
         SendInternalError();
         CloseConnectionToClient();
@@ -567,7 +567,7 @@ static void ProcessFileRequest()
     if(error)
     {
         if(server_verbose_mode > VERBOSE_MODE_SILENT)
-            printf("*** Error opening file: %i\r\n", error);
+            printf("*** Error opening file: %xh\r\n", error);
 
         SendInternalError();
         CloseConnectionToClient();
@@ -624,17 +624,11 @@ static void ContinueSendingFile()
         {
             output_data_length = sizeof(output_data_buffer);
             error = ReadFromFile(file_handle, output_data_buffer, &output_data_length);
-            if(error == ERR_EOF)
+            if(error != 0)
             {
-                CloseConnectionToClient();
-                return;
-            }
-            else if(error != 0)
-            {
-                if(server_verbose_mode > VERBOSE_MODE_SILENT)
-                    printf("*** Error reading file: %i\r\n", error);
+                if(error != ERR_EOF && server_verbose_mode > VERBOSE_MODE_SILENT)
+                    printf("*** Error reading file: %xh\r\n", error);
 
-                SendInternalError();
                 CloseConnectionToClient();
                 return;
             }

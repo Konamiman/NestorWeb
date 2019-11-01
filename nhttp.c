@@ -125,6 +125,7 @@ void Initialize()
     InitializeTcpIpUnapi();
     CHECK(TcpIpSupportsPassiveTcpConnections, "The TCP/IP UNAPI implementation doesn't support passive TCP connections");
 
+    DisableDiskErrorPrompt();
     AbortAllTransientTcpConnections();
 
     printf("Base directory: %s\r\n", base_directory);
@@ -147,5 +148,4 @@ void TerminateWithErrorMessage(char* message)
 void Cleanup()
 {
     CleanupHttpAutomaton();
-    AbortAllTransientTcpConnections();
 }
