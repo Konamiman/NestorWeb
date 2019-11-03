@@ -55,7 +55,8 @@ static void SendErrorResponseToClient(int statusCode, char* statusMessage, char*
 static char* ConvertRequestToFilename(char** query_string_start);
 static void SendNotFoundError();
 static void SendInternalError();
-static void ProcessFileRequest();
+static void ProcessFileOrDirectoryRequest();
+static void StartSendingFile();
 static void SendContentLengthHeader(ulong length);
 static void ContinueSendingFile();
 extern void _ultoa(long val, char* buffer, char base);
@@ -341,26 +342,23 @@ static void ContinueReadingHeaders()
         return;
 
     if(data_buffer_length > 0)
-    {
-        if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
-            printf("<-- %s\r\n", data_buffer);
-
         ProcessHeader();
-        InitializeDataBuffer();
-    }
     else
-    {
-        ProcessFileRequest();
-    }
+        ProcessFileOrDirectoryRequest();
 }
 
 
 static void ProcessHeader()
 {
+    if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
+        printf("<-- %s\r\n", data_buffer);
+
     if(strncmpi(data_buffer, "If-Modified-Since:", 18))
     {
         has_if_modified_since = ParseVerboseDateTime(&data_buffer[18], &if_modified_since_date);
     }
+
+    InitializeDataBuffer();
 }
 
 
@@ -509,33 +507,25 @@ static void SendInternalError()
 }
 
 
-static void ProcessFileRequest()
+static void ProcessFileOrDirectoryRequest()
 {
     byte error;
-    byte buffer[64];
-    byte buffer2[32];
-    dateTime date_time;
 
     error = SearchFile(filename_buffer, &file_fib, true);
+
+    if(error == 0 && (file_fib.attributes & FILE_ATTR_DIRECTORY))
+    {
+        strcat(filename_buffer, default_document);
+        error = SearchFile(filename_buffer, &file_fib, false);
+    }
+
     if(error == ERR_NOFIL || error == ERR_NODIR)
     {
         SendNotFoundError();
         CloseConnectionToClient();
         return;
     }
-    else if(error == 0 && (file_fib.attributes & FILE_ATTR_DIRECTORY))
-    {
-        strcat(filename_buffer, default_document);
-        error = SearchFile(filename_buffer, &file_fib, false);
-        if(error == ERR_NOFIL)
-        {
-            SendNotFoundError();
-            CloseConnectionToClient();
-            return;
-        }
-    }
-    
-    if(error >= MIN_DISK_ERROR_CODE || error == ERR_NHAND || error == ERR_NORAM)
+    else if(error >= MIN_DISK_ERROR_CODE || error == ERR_NHAND || error == ERR_NORAM)
     {
         if(server_verbose_mode > VERBOSE_MODE_SILENT)
             printf("*** Error searching file: %xh\r\n", error);
@@ -550,6 +540,16 @@ static void ProcessFileRequest()
         CloseConnectionToClient();
         return;
     }
+
+    StartSendingFile();
+}
+
+static void StartSendingFile()
+{
+    byte error;
+    byte buffer[64];
+    byte buffer2[32];
+    dateTime date_time;
 
     if(file_fib.dateOfModification != 0)
     {
@@ -596,6 +596,8 @@ static void ProcessFileRequest()
     output_data_length = 0;
     PrintUnlessSilent("Sending file contents...\r\n");
     automaton_state = HTTPA_SENDING_RESPONSE;
+
+    ContinueSendingFile();
 }
 
 
