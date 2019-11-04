@@ -11,6 +11,14 @@
 
 #define MAX_FILE_PATH_LEN 64
 
+#define ERAFNK 0x00CC
+#define DSPFNK 0x00CF
+#define CNSDFG 0xF3DE //0=display function keys, other=hide
+#define FNKSTR 0xF87F //Function key contents (10 x 16 bytes)
+#define F_KEY_CONTENTS_LENGTH 16
+
+#define F_KEY_CONTENTS_POINTER(key) ((char*)FNKSTR + ((key)-1)*F_KEY_CONTENTS_LENGTH)
+
 bool MsxDos2IsRunning();
 void TerminateWithErrorCode(byte errorCode);
 byte NormalizeDirectory(char* directoryPath, char* normalizedDirectoryPath);
@@ -20,5 +28,9 @@ byte OpenFile(void* path_or_fib, byte* file_handle);
 byte ReadFromFile(byte file_handle, byte* destination, int* length);
 void CloseFile(byte file_handle);
 void DisableDiskErrorPrompt();
+bool FunctionKeysAreVisible();
+void DisplayFunctionKeys();
+void HideFunctionKeys();
+void SetFunctionKeyContents(int key, char* contents);
 
 #endif

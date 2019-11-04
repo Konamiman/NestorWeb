@@ -163,3 +163,29 @@ ABORT_CODE:
 
     __endasm;
 }
+
+
+bool FunctionKeysAreVisible()
+{
+    return *((byte*)CNSDFG) == 0;
+}
+
+void DisplayFunctionKeys()
+{
+	BiosCall(DSPFNK, &regs, REGS_NONE);
+}
+
+
+void HideFunctionKeys()
+{
+	BiosCall(ERAFNK, &regs, REGS_NONE);
+}
+
+
+void SetFunctionKeyContents(int key, char* contents)
+{
+    memset(F_KEY_CONTENTS_POINTER(key), (int)' ', F_KEY_CONTENTS_LENGTH);
+    if(contents)
+	    strcpy(F_KEY_CONTENTS_POINTER(key), contents);
+}
+

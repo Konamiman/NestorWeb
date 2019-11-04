@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "types.h"
 #include "system.h"
 #include "tcpip.h"
@@ -30,10 +31,12 @@ char http_error_buffer[80];
 uint port;
 int verbose_mode;
 int inactivity_timeout;
-
+bool function_keys_were_visible;
+char function_keys_backup[5 * F_KEY_CONTENTS_LENGTH];
 
 void ProcessArguments(char** argv, int argc);
 void Initialize();
+void InitializeInfoArea(char* ip, uint port);
 void TerminateWithErrorMessage(char* message);
 void Cleanup();
 
@@ -117,7 +120,7 @@ void ProcessArguments(char** argv, int argc)
 
 void Initialize()
 {
-    byte buffer[4];
+    byte ip[4];
 
     CHECK(MsxDos2IsRunning, "MSX-DOS 2 required");
 
@@ -130,13 +133,32 @@ void Initialize()
 
     printf("Base directory: %s\r\n", base_directory);
 
-    GetLocalIpAddress(buffer);
-    printf("Listening on %i.%i.%i.%i:%u\r\n", buffer[0], buffer[1], buffer[2], buffer[3], port);
+    GetLocalIpAddress(ip);
+    printf("Listening on %i.%i.%i.%i:%u\r\n", ip[0], ip[1], ip[2], ip[3], port);
     printf("Press any key to exit\r\n\r\n");
+
+    InitializeInfoArea(ip, port);
 
     InitializeHttpAutomaton(base_directory, http_error_buffer, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND);
 }
 
+
+void InitializeInfoArea(char* ip, uint port)
+{
+    byte buffer[16];
+
+    function_keys_were_visible = FunctionKeysAreVisible();
+    memcpy(function_keys_backup, F_KEY_CONTENTS_POINTER(1), sizeof(function_keys_backup));
+    SetFunctionKeyContents(1, "Server address:");
+    sprintf(buffer, "%i.%i.%i.%i", ip[0], ip[1], ip[2], ip[3]);
+    SetFunctionKeyContents(2, buffer);
+    sprintf(buffer, "Port: %i", port);
+    SetFunctionKeyContents(3, buffer);
+    SetFunctionKeyContents(4, null);
+    SetFunctionKeyContents(5, null);
+    DisplayFunctionKeys();
+
+}
 
 void TerminateWithErrorMessage(char* message)
 {
@@ -148,4 +170,7 @@ void TerminateWithErrorMessage(char* message)
 void Cleanup()
 {
     CleanupHttpAutomaton();
+
+    HideFunctionKeys();
+    memcpy(F_KEY_CONTENTS_POINTER(1), function_keys_backup, sizeof(function_keys_backup));
 }
