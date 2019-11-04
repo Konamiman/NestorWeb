@@ -29,6 +29,9 @@ static fileInfoBlock file_fib;
 static bool send_as_attachment;
 static bool has_if_modified_since;
 static dateTime if_modified_since_date;
+static byte buffer[64];
+static byte buffer2[32];
+
 static char num_buffer[11];
 static char content_length_buffer[32];
 
@@ -388,8 +391,6 @@ static void SendResponseStart(int statusCode, char* statusMessage)
 
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content)
 {
-    char buffer[64];
-
     SendResponseStart(statusCode, statusMessage);
     if(statusCode > 300 && statusCode < 400)
     {
@@ -547,8 +548,6 @@ static void ProcessFileOrDirectoryRequest()
 static void StartSendingFile()
 {
     byte error;
-    byte buffer[64];
-    byte buffer2[32];
     dateTime date_time;
 
     if(file_fib.dateOfModification != 0)
