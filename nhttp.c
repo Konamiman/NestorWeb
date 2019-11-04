@@ -14,14 +14,16 @@ const char* strTitle =
     "\r\n";
 
 const char* strHelp =
-    "Usage: NHTTP <base directory> [p=<port>] [v=0|1|2] [t=<timeout>]\r\n"
+    "Usage: NHTTP <base directory> [p=<port>] [v=0|1|2] [t=<timeout>] [d=0|1]\r\n"
     "\r\n"
     "p: Server port number, 1-" MAX_USABLE_TCP_PORT_STR ", default is 80\r\n"
     "v: Verbosity mode:\r\n"
     "   0: silent, 1: show connections and errors (default), 2: show all headers\r\n"
     "t: Inactivity timeout for client connections in seconds, default is " DEFAULT_INACTIVITY_TIMEOUT_SECS_STR "\r\n"
+    "d: enable directory listing when 1 (default: disabled)\r\n"
     "\r\n"
-    "A request for \"/\" or for a directory will serve INDEX.HTM file if it exists.\r\n"
+    "When directory listing is disabled, a request for \"/\" or for a directory will\r\n"
+    "serve INDEX.HTM file if it exists, or return a Not Found status if it doesn't.\r\n"
     "\r\n"
     "Files are sent as attachments if \"?a=1\" is added to the request.\r\n"
     "\r\n";
@@ -31,6 +33,7 @@ char http_error_buffer[80];
 uint port;
 int verbose_mode;
 int inactivity_timeout;
+bool directory_listing_enabled;
 bool function_keys_were_visible;
 char function_keys_backup[5 * F_KEY_CONTENTS_LENGTH];
 
@@ -88,6 +91,7 @@ void ProcessArguments(char** argv, int argc)
     port = HTTP_DEFAULT_SERVER_PORT;
     verbose_mode = VERBOSE_MODE_CONNECTIONS;
     inactivity_timeout = DEFAULT_INACTIVITY_TIMEOUT_SECS;
+    directory_listing_enabled = false;
 
     for(i = 1; i<argc; i++)
     {
@@ -101,6 +105,10 @@ void ProcessArguments(char** argv, int argc)
         else if(c == 'v')
         {
             verbose_mode = ((byte)argv[i][2]-'0');
+        }
+        else if(c == 'd')
+        {
+            directory_listing_enabled = ((byte)argv[i][2]-'0');
         }
         else if(c == 't')
         {
@@ -132,6 +140,7 @@ void Initialize()
     AbortAllTransientTcpConnections();
 
     printf("Base directory: %s\r\n", base_directory);
+    printf("Directory listing is %s\r\n", directory_listing_enabled ? "ON" : "OFF");
 
     GetLocalIpAddress(ip);
     printf("Listening on %i.%i.%i.%i:%u\r\n", ip[0], ip[1], ip[2], ip[3], port);
@@ -139,7 +148,7 @@ void Initialize()
 
     InitializeInfoArea(ip, port);
 
-    InitializeHttpAutomaton(base_directory, http_error_buffer, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND);
+    InitializeHttpAutomaton(base_directory, http_error_buffer, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND, directory_listing_enabled);
 }
 
 

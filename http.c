@@ -29,6 +29,7 @@ static fileInfoBlock file_fib;
 static bool send_as_attachment;
 static bool has_if_modified_since;
 static dateTime if_modified_since_date;
+static bool directory_listing_enabled;
 static byte buffer[64];
 static byte buffer2[32];
 
@@ -76,11 +77,13 @@ static void InitializeDataBuffer()
 }
 
 
-void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks)
+void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing)
 {
     server_port = port;
     server_verbose_mode = verbose_mode;
     client_inactivity_timeout = inactivity_timeout_in_ticks;
+    directory_listing_enabled = enable_directory_listing;
+
     files_base_directory = base_directory;
     error_buffer = http_error_buffer;
     error_buffer[0] = '\0';
