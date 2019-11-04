@@ -121,14 +121,15 @@ byte GetSimplifiedTcpConnectionState()
 }
 
 
-void CloseTcpConnection()
+bool CloseTcpConnection()
 {
     if(connection_id == 0)
-        return;
+        return false;
 
     regs.Bytes.B = connection_id;
     UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_CLOSE, &regs, REGS_MAIN, REGS_NONE);
     connection_id = 0;
+    return true;
 }
 
 

@@ -10,6 +10,7 @@
 #define DEFAULT_INACTIVITY_TIMEOUT_SECS 5
 #define DEFAULT_INACTIVITY_TIMEOUT_SECS_STR "5"
 
+#define QUERY_STRING_SEPARATOR '?'
 
 enum HttpAutomatonStates {
     HTTPA_NONE,
@@ -20,5 +21,6 @@ enum HttpAutomatonStates {
 };
 
 
-void InitializeHttpAutomaton(char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks);
+void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks);
+void CleanupHttpAutomaton();
 void DoHttpServerAutomatonStep();

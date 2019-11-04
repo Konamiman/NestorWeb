@@ -191,14 +191,21 @@
 #define ERR_INSDSK 0x7F
 #define ERR_PRAK   0x7E
 
+// Disk errors are those that trigger an "Abort, Retry, Ignore?" prompt by default
+#define MIN_DISK_ERROR_CODE 0xF0
+
+// File attributes
+
+#define FILE_ATTR_DIRECTORY (1 << 4)
+
 // Data structures
 
 typedef struct {
     byte alwaysFF;
     char filename[13];
     byte attributes;
-    byte timeOfModification[2];
-    byte dateOfModification[2];
+    uint timeOfModification;
+    uint dateOfModification;
     unsigned int startCluster;
     unsigned long fileSize;
     byte logicalDrive;

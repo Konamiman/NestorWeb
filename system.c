@@ -7,7 +7,7 @@
 
 
 static Z80_registers regs;
-fileInfoBlock fib;
+static fileInfoBlock fib;
 
 
 bool MsxDos2IsRunning()
@@ -84,3 +84,108 @@ bool KeyIsPressed()
     DosCall(F_DIRIO, &regs, REGS_MAIN, REGS_MAIN);
     return regs.Bytes.A != 0;
 }
+
+
+byte SearchFile(char* fileName, fileInfoBlock* fib, bool include_dirs)
+{
+    regs.Words.DE = (int)fileName;
+    regs.Bytes.B = include_dirs ? FILE_ATTR_DIRECTORY : 0;
+    regs.Words.IX = (int)fib;
+    DosCall(F_FFIRST, &regs, REGS_ALL, REGS_MAIN);
+    return regs.Bytes.A;
+}
+
+
+byte OpenFile(void* path_or_fib, byte* file_handle)
+{
+    regs.Words.DE = (int)path_or_fib;
+    regs.Bytes.A = 0;
+    DosCall(F_OPEN, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A == 0)
+        *file_handle = regs.Bytes.B;
+    
+    return regs.Bytes.A;
+}
+
+
+byte ReadFromFile(byte file_handle, byte* destination, int* length)
+{
+    regs.Bytes.B = file_handle;
+    regs.Words.DE = (int)destination;
+    regs.Words.HL = *length;
+    DosCall(F_READ, &regs, REGS_MAIN, REGS_MAIN);
+    *length = regs.Words.HL;
+    return regs.Bytes.A;
+}
+
+
+void CloseFile(byte file_handle)
+{
+    regs.Bytes.B = file_handle;
+    DosCall(F_READ, &regs, REGS_MAIN, REGS_NONE);
+}
+
+
+// This prevents disk errors from triggering an "Abort, Retry, Ignore?" prompt,
+// which wouldn't be a nice behavior for a server.
+void DisableDiskErrorPrompt() __naked
+{
+    __asm
+    
+    push    ix
+    ld de,#DSKERR_CODE
+    ld c,#F_DEFER
+    call    #5
+    ld  de,#ABORT_CODE
+    ld  c,#F_DEFAB
+    call    #5
+    pop ix
+    ret
+
+    ;--- Disk error handling routine
+DSKERR_CODE:
+    ld a,#1  ;Always return "Abort"
+    ret
+
+    ;--- Program termination handling routine
+ABORT_CODE:
+    ld c,a
+    cp #ERR_ABORT
+    ld a,c
+    ret nz ;Not a disk error abort -> the program is willingfully terminating
+
+    ;This causes execution to return to the caller of the DOS function call,
+    ;instead of continuing to the termination of the program
+    pop hl
+
+    ld a,b  ;For ERR_ABORT, B contains the actual disk error code
+    ret
+
+    __endasm;
+}
+
+
+bool FunctionKeysAreVisible()
+{
+    return *((byte*)CNSDFG) == 0;
+}
+
+void DisplayFunctionKeys()
+{
+	BiosCall(DSPFNK, &regs, REGS_NONE);
+}
+
+
+void HideFunctionKeys()
+{
+	BiosCall(ERAFNK, &regs, REGS_NONE);
+}
+
+
+void SetFunctionKeyContents(int key, char* contents)
+{
+    memset(F_KEY_CONTENTS_POINTER(key), (int)' ', F_KEY_CONTENTS_LENGTH);
+    if(contents)
+	    strcpy(F_KEY_CONTENTS_POINTER(key), contents);
+}
+
