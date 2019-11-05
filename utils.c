@@ -56,6 +56,21 @@ void ToVerboseDate(char* dst, dateTime* date_time)
 }
 
 
+void ToIsoDate(char* dst, dateTime* date_time)
+{
+    //<year>-<month>-<day> <hour>:<minute>:<second>
+    sprintf(
+        dst,
+         "%i-%s%i-%s%i %s%i:%s%i:%s%i",
+         date_time->year,
+         PaddingFor(date_time->month), date_time->month,
+         PaddingFor(date_time->day), date_time->day,
+         PaddingFor(date_time->hour), date_time->hour,
+         PaddingFor(date_time->minute), date_time->minute,
+         PaddingFor(date_time->second), date_time->second);
+}
+
+
 void ParseFibDateTime(fileInfoBlock* fib, dateTime* date_time)
 {
     /*

@@ -26,6 +26,7 @@ static char filename_buffer[MAX_FILE_PATH_LEN*2];
 static char* files_base_directory;
 static byte file_handle;
 static fileInfoBlock file_fib;
+static fileInfoBlock dir_list_fib;
 static bool send_as_attachment;
 static bool has_if_modified_since;
 static dateTime if_modified_since_date;
@@ -44,7 +45,7 @@ static const char* connection_closed_by_client_str = "Connection closed by clien
 //Note that this one has the chunked transfer size hardcoded at the beginning.
 //Don't do this at home, kids.
 static const char* dir_list_header_1 = 
-    "19B\r\n"
+    "1B1\r\n"
     "<html>"
     "<head>"
     "<style type='text/css'>"
@@ -55,7 +56,7 @@ static const char* dir_list_header_1 =
     "td:nth-of-type(1) {padding-right: 30px; font-weight: bold;} "
     "td:nth-of-type(2) {text-align: right;} "
     "td:nth-of-type(3) {padding-left: 30px;} "
-    "a { color: white; }"
+    "a { color: white; text-decoration: none;}"
     "</style>"
     "\r\n";
 
@@ -71,6 +72,13 @@ static const char* dir_list_footer =
     "<p>NestorHTTP " VERSION "</p>"
     "</body>"
     "</html>";
+
+static const char* dir_list_entry =
+    "<tr>"
+    "<td><a href=\"%s%s\">%s%s</td>"
+    "<td>%s</td>"
+    "<td>%s</td>"
+    "</tr>";
 
 static const char* empty_str = "";
 
@@ -729,6 +737,7 @@ static void StartSendingDirectory()
     //outgoing TCP data in one go.
 
     char* dir_name_pointer;
+    byte error;
 
     if(automaton_state == HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1)
     {
@@ -758,25 +767,83 @@ static void StartSendingDirectory()
         output_data_length = 0;
         automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_ENTRIES;
 
+        dir_list_fib.alwaysFF = 0;
         ContinueSendingDirectory();
     }
 }
 
 
+#define dir_list_date if_modified_since_date
+
 static void ContinueSendingDirectory()
 {
-    if(GetSimplifiedTcpConnectionState() == TCP_STATE_CLOSED)
+    byte error;
+    bool is_directory;
+
+    while(true)
     {
-        PrintUnlessSilent(connection_lost_str);
-        CloseConnectionToClient();
-        return;
+        if(GetSimplifiedTcpConnectionState() == TCP_STATE_CLOSED)
+        {
+            PrintUnlessSilent(connection_lost_str);
+            CloseConnectionToClient();
+            return;
+        }
+
+        if(output_data_length == 0)
+        {
+            if(dir_list_fib.alwaysFF == 0)
+                error = SearchFile(&file_fib, &dir_list_fib, true);
+            else
+                error = SearchNextFile(&dir_list_fib);
+
+            if(error == ERR_NOFIL)
+            {
+                output_data_length = 0;
+                automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_FOOTER;
+                FinishSendingDirectory();
+                return;
+            }
+            else if(error != 0)
+            {
+                if(server_verbose_mode > VERBOSE_MODE_SILENT)
+                    printf("*** Error retrieving directory contents: %xh\r\n", error);
+                CloseConnectionToClient();
+                return;
+            }
+
+            if(dir_list_fib.filename[0] == '.')
+                continue;
+
+            is_directory = (dir_list_fib.attributes & FILE_ATTR_DIRECTORY) != 0;
+
+            if(!is_directory)
+                _ultoa(dir_list_fib.fileSize, buffer, 10);
+
+            if(dir_list_fib.dateOfModification != 0)
+            {
+                ParseFibDateTime(&dir_list_fib, &dir_list_date);
+                ToIsoDate(buffer2, &dir_list_date);
+            }
+            else
+            {
+                *buffer2 = '\0';
+            }
+
+            sprintf(data_buffer, dir_list_entry,
+                dir_list_fib.filename, is_directory ? "/" : "?a=1",
+                dir_list_fib.filename,
+                is_directory ? "/" : empty_str,
+                is_directory ? "&lt;DIR&gt;" : buffer,
+                buffer2);
+            
+            PrepareChunkedData(data_buffer);
+        }
+
+        if(SendDataToTcpConnection(output_data_buffer, output_data_length))
+            output_data_length = 0;
+        else
+            return;
     }
-
-    //TODO: Send directory entries
-
-    output_data_length = 0;
-    automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_FOOTER;
-    FinishSendingDirectory();
 }
 
 
