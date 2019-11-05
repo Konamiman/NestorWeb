@@ -139,16 +139,18 @@ void Initialize()
     DisableDiskErrorPrompt();
     AbortAllTransientTcpConnections();
 
+    GetLocalIpAddress(ip);
+    if(*(long*)ip == 0)
+        TerminateWithErrorMessage("Local IP address is not configured");
+
     printf("Base directory: %s\r\n", base_directory);
     printf("Directory listing is %s\r\n", directory_listing_enabled ? "ON" : "OFF");
-
-    GetLocalIpAddress(ip);
     printf("Listening on %i.%i.%i.%i:%u\r\n", ip[0], ip[1], ip[2], ip[3], port);
     printf("Press any key to exit\r\n\r\n");
 
     InitializeInfoArea(ip, port);
 
-    InitializeHttpAutomaton(base_directory, http_error_buffer, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND, directory_listing_enabled);
+    InitializeHttpAutomaton(base_directory, http_error_buffer, ip, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND, directory_listing_enabled);
 }
 
 

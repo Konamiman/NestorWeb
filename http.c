@@ -19,6 +19,7 @@ static int last_system_timer_value;
 static int ticks_without_data;
 static byte output_data_buffer[512];
 static int output_data_length;
+static byte server_ip[4];
 static int server_port;
 static bool server_verbose_mode;
 static int client_inactivity_timeout;
@@ -34,6 +35,7 @@ static bool directory_listing_enabled;
 static byte base_directory_length;
 static byte buffer[64];
 static byte buffer2[32];
+static byte requested_resource[MAX_FILE_PATH_LEN+1];
 
 static char num_buffer[11];
 static char content_length_buffer[32];
@@ -105,6 +107,7 @@ static void StartSendingFile();
 static void SendContentLengthHeader(ulong length);
 static void ContinueSendingFile();
 static void StartSendingDirectory();
+static void ContinueSendingDirectoryHeaders();
 static void StandarizeSlashes(char* path);
 static void ContinueSendingDirectory();
 static void PrepareHtmlForDirectoryEntry();
@@ -127,8 +130,9 @@ static void InitializeDataBuffer()
 }
 
 
-void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing)
+void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, byte* ip, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing)
 {
+    memcpy(server_ip, ip, 4);
     server_port = port;
     server_verbose_mode = verbose_mode;
     client_inactivity_timeout = inactivity_timeout_in_ticks;
@@ -179,7 +183,7 @@ void DoHttpServerAutomatonStep()
             break;
         case HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1:
         case HTTPA_SENDING_DIRECTORY_LISTING_HEADER_2:
-            StartSendingDirectory();
+            ContinueSendingDirectoryHeaders();
             break;
         case HTTPA_SENDING_DIRECTORY_LISTING_ENTRIES:
             ContinueSendingDirectory();
@@ -513,6 +517,8 @@ static char* ConvertRequestToFilename(char** query_string_start)
 {
     char* pointer;
     char* start_pointer;
+    char* requested_resource_pointer;
+    int requested_resource_length;
     char ch;
     bool last_char_was_dot;
 
@@ -525,10 +531,18 @@ static char* ConvertRequestToFilename(char** query_string_start)
     if(*pointer == '/') pointer++;
 
     start_pointer = pointer;
+    requested_resource_pointer = requested_resource;
+    requested_resource_length = 0;
 
     last_char_was_dot = false;
     while((ch = *pointer) > ' ' && ch != QUERY_STRING_SEPARATOR)
     {
+        if(requested_resource_length < MAX_FILE_PATH_LEN)
+        {
+            *requested_resource_pointer++ = ch;
+            requested_resource_length++;
+        }
+
         if(ch == '/')
         {
             *pointer = '\\';
@@ -548,6 +562,8 @@ static char* ConvertRequestToFilename(char** query_string_start)
         
         pointer++;
     }
+
+    *requested_resource_pointer = '\0';
 
     if(ch == QUERY_STRING_SEPARATOR)
         *query_string_start = pointer+1;
@@ -577,6 +593,7 @@ static void ProcessFileOrDirectoryRequest()
 {
     byte error;
     bool is_directory;
+    dateTime date_time;
 
     is_directory = false;
 
@@ -618,21 +635,9 @@ static void ProcessFileOrDirectoryRequest()
     }
 
     if(is_directory)
-    {
-        PrintUnlessSilent("Sending directory listing...\r\n");
-        SendResponseStart(200, "Ok");
-        SendLineToClient("Content-Type: text/html");
-        SendLineToClient("Transfer-Encoding: chunked");
-        SendLineToClient(empty_str);
-
-        automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1;
-        output_data_length = 0;
         StartSendingDirectory();
-    }
     else
-    {
         StartSendingFile();
-    }
 }
 
 
@@ -735,6 +740,38 @@ static void ContinueSendingFile()
 
 
 static void StartSendingDirectory()
+{
+    //If a request for a directory doesn't end with a '/', redirect to
+    //the versin with a '/' so that relative links in the files list
+    //work as expected.
+
+    if(*requested_resource != '\0' && requested_resource[strlen(requested_resource)-1] != '/')
+    {
+        SendResponseStart(308, "Moved Permanently");
+        sprintf(output_data_buffer, "Location: http://%i.%i.%i.%i:%u/%s/",
+            server_ip[0], server_ip[1], server_ip[2], server_ip[3],
+            server_port,
+            requested_resource);
+        SendLineToClient(output_data_buffer);
+        SendLineToClient(empty_str);
+        CloseConnectionToClient();
+    }
+    else
+    {
+        PrintUnlessSilent("Sending directory listing...\r\n");
+        SendResponseStart(200, "Ok");
+        SendLineToClient("Content-Type: text/html");
+        SendLineToClient("Transfer-Encoding: chunked");
+        SendLineToClient(empty_str);
+
+        automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1;
+        output_data_length = 0;
+        ContinueSendingDirectoryHeaders();
+    }
+}
+
+
+static void ContinueSendingDirectoryHeaders()
 {
     //We send the header in two steps because TCP/IP UNAPI implementations
     //aren't required to be able to accept more than 512 bytes of

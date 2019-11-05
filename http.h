@@ -25,6 +25,6 @@ enum HttpAutomatonStates {
 };
 
 
-void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing);
+void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, byte* ip, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing);
 void CleanupHttpAutomaton();
 void DoHttpServerAutomatonStep();
