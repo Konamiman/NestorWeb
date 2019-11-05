@@ -45,18 +45,18 @@ static const char* connection_closed_by_client_str = "Connection closed by clien
 //Note that this one has the chunked transfer size hardcoded at the beginning.
 //Don't do this at home, kids.
 static const char* dir_list_header_1 = 
-    "1B1\r\n"
+    "1C2\r\n"
     "<html>"
     "<head>"
     "<style type='text/css'>"
     "body {font-family: sans-serif; color: white; background-color: blue;} "
-    "p {font-size: small; color: lightgray; font-style: italic; margin-top: 20px;} "
+    "p a {font-size: small; color: lightgray; font-style: italic; margin-top: 20px;} "
     "table {font-family: monospace;} "
     "td {border: 0px solid black;} "
     "td:nth-of-type(1) {padding-right: 30px; font-weight: bold;} "
     "td:nth-of-type(2) {text-align: right;} "
     "td:nth-of-type(3) {padding-left: 30px;} "
-    "a { color: white; text-decoration: none;}"
+    "a { color: white; text-decoration: none; display:block;}"
     "</style>"
     "\r\n";
 
@@ -69,7 +69,7 @@ static const char* dir_list_header_2 =
 
 static const char* dir_list_footer = 
     "</table>"
-    "<p>NestorHTTP " VERSION "</p>"
+    "<p><a href=\"http://github.com/Konamiman/NestorHTTP\">NestorHTTP " VERSION "</a></p>"
     "</body>"
     "</html>";
 
@@ -105,7 +105,11 @@ static void StartSendingFile();
 static void SendContentLengthHeader(ulong length);
 static void ContinueSendingFile();
 static void StartSendingDirectory();
+static void StandarizeSlashes(char* path);
 static void ContinueSendingDirectory();
+static void PrepareHtmlForDirectoryEntry();
+static void SendParentDirectoryLink(char* dir_name);
+static void RemoveLastPartOfPath(char* path);
 static void FinishSendingDirectory();
 static void PrepareChunkedData(char* data);
 
@@ -737,6 +741,7 @@ static void StartSendingDirectory()
     //outgoing TCP data in one go.
 
     char* dir_name_pointer;
+    char* pointer;
     byte error;
 
     if(automaton_state == HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1)
@@ -758,6 +763,9 @@ static void StartSendingDirectory()
     if(output_data_length == 0)
     {
         dir_name_pointer = &filename_buffer[base_directory_length];
+
+        StandarizeSlashes(dir_name_pointer);
+
         sprintf(data_buffer, dir_list_header_2, dir_name_pointer, dir_name_pointer);
         PrepareChunkedData(data_buffer);
     }
@@ -773,12 +781,25 @@ static void StartSendingDirectory()
 }
 
 
+static void StandarizeSlashes(char* path)
+{
+    while(*path)
+    {
+        if(*path == '\\')
+            *path = '/';
+
+        path++;
+    }
+}
+
+
 #define dir_list_date if_modified_since_date
 
 static void ContinueSendingDirectory()
 {
     byte error;
     bool is_directory;
+    char* dir_name;
 
     while(true)
     {
@@ -792,9 +813,17 @@ static void ContinueSendingDirectory()
         if(output_data_length == 0)
         {
             if(dir_list_fib.alwaysFF == 0)
+            {
                 error = SearchFile(&file_fib, &dir_list_fib, true);
+
+                dir_name = &filename_buffer[base_directory_length];
+                if(strlen(dir_name) != 1)
+                    SendParentDirectoryLink(dir_name);
+            }
             else
+            {
                 error = SearchNextFile(&dir_list_fib);
+            }
 
             if(error == ERR_NOFIL)
             {
@@ -814,29 +843,7 @@ static void ContinueSendingDirectory()
             if(dir_list_fib.filename[0] == '.')
                 continue;
 
-            is_directory = (dir_list_fib.attributes & FILE_ATTR_DIRECTORY) != 0;
-
-            if(!is_directory)
-                _ultoa(dir_list_fib.fileSize, buffer, 10);
-
-            if(dir_list_fib.dateOfModification != 0)
-            {
-                ParseFibDateTime(&dir_list_fib, &dir_list_date);
-                ToIsoDate(buffer2, &dir_list_date);
-            }
-            else
-            {
-                *buffer2 = '\0';
-            }
-
-            sprintf(data_buffer, dir_list_entry,
-                dir_list_fib.filename, is_directory ? "/" : "?a=1",
-                dir_list_fib.filename,
-                is_directory ? "/" : empty_str,
-                is_directory ? "&lt;DIR&gt;" : buffer,
-                buffer2);
-            
-            PrepareChunkedData(data_buffer);
+            PrepareHtmlForDirectoryEntry();
         }
 
         if(SendDataToTcpConnection(output_data_buffer, output_data_length))
@@ -844,6 +851,63 @@ static void ContinueSendingDirectory()
         else
             return;
     }
+}
+
+
+static void PrepareHtmlForDirectoryEntry()
+{
+    bool is_directory;
+
+    is_directory = (dir_list_fib.attributes & FILE_ATTR_DIRECTORY) != 0;
+
+    if(!is_directory)
+        _ultoa(dir_list_fib.fileSize, buffer, 10);
+
+    if(dir_list_fib.dateOfModification != 0)
+    {
+        ParseFibDateTime(&dir_list_fib, &dir_list_date);
+        ToIsoDate(buffer2, &dir_list_date);
+    }
+    else
+    {
+        *buffer2 = '\0';
+    }
+
+    sprintf(data_buffer, dir_list_entry,
+        dir_list_fib.filename, is_directory ? "/" : "?a=1",
+        dir_list_fib.filename,
+        is_directory ? "/" : empty_str,
+        is_directory ? "&lt;DIR&gt;" : buffer,
+        buffer2);
+    
+    PrepareChunkedData(data_buffer);
+}
+
+
+static void SendParentDirectoryLink(char* dir_name)
+{
+    strcpy(buffer, dir_name);
+    RemoveLastPartOfPath(buffer);
+
+    sprintf(data_buffer, dir_list_entry,
+        buffer, empty_str,
+        "../", empty_str,
+        empty_str,
+        empty_str);
+
+    PrepareChunkedData(data_buffer);
+    SendDataToTcpConnection(output_data_buffer, output_data_length);
+    output_data_length = 0;
+}
+
+
+static void RemoveLastPartOfPath(char* path)
+{
+    char* pointer;
+
+    pointer = path + strlen(path);
+    while(*pointer-- != '/');
+    pointer[2] = '\0';
 }
 
 
