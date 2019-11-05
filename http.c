@@ -30,16 +30,49 @@ static bool send_as_attachment;
 static bool has_if_modified_since;
 static dateTime if_modified_since_date;
 static bool directory_listing_enabled;
+static byte base_directory_length;
 static byte buffer[64];
 static byte buffer2[32];
 
 static char num_buffer[11];
 static char content_length_buffer[32];
 
-static char* default_document = "\\INDEX.HTM";
-static char* connection_lost_str = "Connection lost\r\n";
-static char* connection_closed_by_client_str = "Connection closed by client\r\n";
+static const char* default_document = "\\INDEX.HTM";
+static const char* connection_lost_str = "Connection lost\r\n";
+static const char* connection_closed_by_client_str = "Connection closed by client\r\n";
 
+//Note that this one has the chunked transfer size hardcoded at the beginning.
+//Don't do this at home, kids.
+static const char* dir_list_header_1 = 
+    "19B\r\n"
+    "<html>"
+    "<head>"
+    "<style type='text/css'>"
+    "body {font-family: sans-serif; color: white; background-color: blue;} "
+    "p {font-size: small; color: lightgray; font-style: italic; margin-top: 20px;} "
+    "table {font-family: monospace;} "
+    "td {border: 0px solid black;} "
+    "td:nth-of-type(1) {padding-right: 30px; font-weight: bold;} "
+    "td:nth-of-type(2) {text-align: right;} "
+    "td:nth-of-type(3) {padding-left: 30px;} "
+    "a { color: white; }"
+    "</style>"
+    "\r\n";
+
+static const char* dir_list_header_2 = 
+    "<title>%s - NestorHTTP</title>"
+    "</head>"
+    "<body>"
+    "<h1>Directory of %s</h1>"
+    "<table>";
+
+static const char* dir_list_footer = 
+    "</table>"
+    "<p>NestorHTTP " VERSION "</p>"
+    "</body>"
+    "</html>";
+
+static const char* empty_str = "";
 
 static void InitializeDataBuffer();
 static void OpenServerConnection();
@@ -63,6 +96,11 @@ static void ProcessFileOrDirectoryRequest();
 static void StartSendingFile();
 static void SendContentLengthHeader(ulong length);
 static void ContinueSendingFile();
+static void StartSendingDirectory();
+static void ContinueSendingDirectory();
+static void FinishSendingDirectory();
+static void PrepareChunkedData(char* data);
+
 extern void _ultoa(long val, char* buffer, char base);
 
 #define PrintUnlessSilent(s) { if(server_verbose_mode > VERBOSE_MODE_SILENT) printf(s); }
@@ -85,6 +123,7 @@ void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, uint
     directory_listing_enabled = enable_directory_listing;
 
     files_base_directory = base_directory;
+    base_directory_length = strlen(base_directory) - 1;
     error_buffer = http_error_buffer;
     error_buffer[0] = '\0';
 
@@ -123,9 +162,19 @@ void DoHttpServerAutomatonStep()
         case HTTPA_READING_HEADERS:
             ContinueReadingHeaders();
             break;
-        case HTTPA_SENDING_RESPONSE:
+        case HTTPA_SENDING_FILE_CONTENTS:
             ContinueSendingFile();
-            break;            
+            break;
+        case HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1:
+        case HTTPA_SENDING_DIRECTORY_LISTING_HEADER_2:
+            StartSendingDirectory();
+            break;
+        case HTTPA_SENDING_DIRECTORY_LISTING_ENTRIES:
+            ContinueSendingDirectory();
+            break;
+        case HTTPA_SENDING_DIRECTORY_LISTING_FOOTER:
+            FinishSendingDirectory();
+            break;
     }
 }
 
@@ -397,7 +446,7 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
     SendResponseStart(statusCode, statusMessage);
     if(statusCode > 300 && statusCode < 400)
     {
-        SendLineToClient("");
+        SendLineToClient(empty_str);
         return;
     }
 
@@ -406,14 +455,14 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
     if(content)
     {
         SendLineToClient("Content-Type: text/html");
-        SendLineToClient("");
+        SendLineToClient(empty_str);
         if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
             printf("--> (HTML response)\r\n");
         SendStringToTcpConnection(content);
     }
     else
     {
-        SendLineToClient("");
+        SendLineToClient(empty_str);
     }
 }
 
@@ -495,7 +544,8 @@ static char* ConvertRequestToFilename(char** query_string_start)
         pointer--;
 
     *pointer = '\0';
-    return start_pointer == pointer ? default_document+1 : start_pointer;
+    
+    return start_pointer == pointer && !directory_listing_enabled ? default_document+1 : start_pointer;
 }
 
 
@@ -514,13 +564,23 @@ static void SendInternalError()
 static void ProcessFileOrDirectoryRequest()
 {
     byte error;
+    bool is_directory;
+
+    is_directory = false;
 
     error = SearchFile(filename_buffer, &file_fib, true);
 
     if(error == 0 && (file_fib.attributes & FILE_ATTR_DIRECTORY))
     {
-        strcat(filename_buffer, default_document);
-        error = SearchFile(filename_buffer, &file_fib, false);
+        if(directory_listing_enabled)
+        {
+            is_directory = true;
+        }
+        else
+        {
+            strcat(filename_buffer, default_document);
+            error = SearchFile(filename_buffer, &file_fib, false);
+        }
     }
 
     if(error == ERR_NOFIL || error == ERR_NODIR)
@@ -545,8 +605,24 @@ static void ProcessFileOrDirectoryRequest()
         return;
     }
 
-    StartSendingFile();
+    if(is_directory)
+    {
+        PrintUnlessSilent("Sending directory listing...\r\n");
+        SendResponseStart(200, "Ok");
+        SendLineToClient("Content-Type: text/html");
+        SendLineToClient("Transfer-Encoding: chunked");
+        SendLineToClient(empty_str);
+
+        automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1;
+        output_data_length = 0;
+        StartSendingDirectory();
+    }
+    else
+    {
+        StartSendingFile();
+    }
 }
+
 
 static void StartSendingFile()
 {
@@ -593,11 +669,11 @@ static void StartSendingFile()
         SendLineToClient(buffer);
     }
 
-    SendLineToClient("");
+    SendLineToClient(empty_str);
 
     output_data_length = 0;
     PrintUnlessSilent("Sending file contents...\r\n");
-    automaton_state = HTTPA_SENDING_RESPONSE;
+    automaton_state = HTTPA_SENDING_FILE_CONTENTS;
 
     ContinueSendingFile();
 }
@@ -643,4 +719,85 @@ static void ContinueSendingFile()
         else
             return;
     }
+}
+
+
+static void StartSendingDirectory()
+{
+    //We send the header in two steps because TCP/IP UNAPI implementations
+    //aren't required to be able to accept more than 512 bytes of
+    //outgoing TCP data in one go.
+
+    char* dir_name_pointer;
+
+    if(automaton_state == HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1)
+    {
+        if(output_data_length == 0)
+        {
+            output_data_length = strlen(dir_list_header_1);
+        }
+
+        if(SendDataToTcpConnection(dir_list_header_1, output_data_length))
+        {
+            output_data_length = 0;
+            automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_HEADER_2;
+        }
+        else
+            return;
+    }
+
+    if(output_data_length == 0)
+    {
+        dir_name_pointer = &filename_buffer[base_directory_length];
+        sprintf(data_buffer, dir_list_header_2, dir_name_pointer, dir_name_pointer);
+        PrepareChunkedData(data_buffer);
+    }
+
+    if(SendDataToTcpConnection(output_data_buffer, output_data_length))
+    {
+        output_data_length = 0;
+        automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_ENTRIES;
+
+        ContinueSendingDirectory();
+    }
+}
+
+
+static void ContinueSendingDirectory()
+{
+    if(GetSimplifiedTcpConnectionState() == TCP_STATE_CLOSED)
+    {
+        PrintUnlessSilent(connection_lost_str);
+        CloseConnectionToClient();
+        return;
+    }
+
+    //TODO: Send directory entries
+
+    output_data_length = 0;
+    automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_FOOTER;
+    FinishSendingDirectory();
+}
+
+
+static void FinishSendingDirectory()
+{
+    if(output_data_length == 0)
+    {
+        PrepareChunkedData(dir_list_footer);
+        strcat(output_data_buffer, "0\r\n\r\n");
+        output_data_length = strlen(output_data_buffer);
+    }
+    
+    if(SendDataToTcpConnection(output_data_buffer, output_data_length))
+    {
+        CloseConnectionToClient();
+    }
+}
+
+
+static void PrepareChunkedData(char* data)
+{
+    sprintf(output_data_buffer, "%x\r\n%s\r\n", strlen(data), data);
+    output_data_length = strlen(output_data_buffer);
 }

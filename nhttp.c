@@ -108,7 +108,7 @@ void ProcessArguments(char** argv, int argc)
         }
         else if(c == 'd')
         {
-            directory_listing_enabled = ((byte)argv[i][2]-'0');
+            directory_listing_enabled = ((byte)argv[i][2]-'0') != 0;
         }
         else if(c == 't')
         {
