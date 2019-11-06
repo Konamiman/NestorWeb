@@ -163,7 +163,7 @@ void InitializeInfoArea(char* ip, uint port)
     SetFunctionKeyContents(1, "Server address:");
     sprintf(buffer, "%i.%i.%i.%i", ip[0], ip[1], ip[2], ip[3]);
     SetFunctionKeyContents(2, buffer);
-    sprintf(buffer, "Port: %i", port);
+    sprintf(buffer, "Port: %u", port);
     SetFunctionKeyContents(3, buffer);
     SetFunctionKeyContents(4, null);
     SetFunctionKeyContents(5, null);

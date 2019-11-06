@@ -8,6 +8,7 @@
 #include "msxdos.h"
 #include <string.h>
 
+#define MAX_CACHE_SECS_FOR_DIRECTORY_LISTING "3600"
 
 static byte automaton_state;
 static char* error_buffer;
@@ -25,6 +26,7 @@ static bool server_verbose_mode;
 static int client_inactivity_timeout;
 static char filename_buffer[MAX_FILE_PATH_LEN*2];
 static char* files_base_directory;
+static bool base_directory_is_root_of_drive;
 static byte file_handle;
 static fileInfoBlock file_fib;
 static fileInfoBlock dir_list_fib;
@@ -37,6 +39,7 @@ static byte base_directory_length;
 static byte buffer[64];
 static byte buffer2[32];
 static byte requested_resource[MAX_FILE_PATH_LEN+1];
+static int requested_resource_length;
 
 static char num_buffer[11];
 static char content_length_buffer[32];
@@ -143,6 +146,7 @@ void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, byte
 
     files_base_directory = base_directory;
     base_directory_length = strlen(base_directory) - 1;
+    base_directory_is_root_of_drive = base_directory_length < 3;
     error_buffer = http_error_buffer;
     error_buffer[0] = '\0';
 
@@ -521,7 +525,7 @@ static char* ConvertRequestToFilename(char** query_string_start)
     char* pointer;
     char* start_pointer;
     char* requested_resource_pointer;
-    int requested_resource_length;
+
     char ch;
     bool last_char_was_dot;
 
@@ -597,6 +601,16 @@ static void ProcessFileOrDirectoryRequest()
     byte error;
     bool is_directory;
     dateTime date_time;
+
+    //We need to treat requesting the root resource + the base directory being the root of the drive
+    //as a special case, since in this case we can't search for the directory itself
+    //(doing that would return the first file in the directory instead).
+    if(directory_listing_enabled && requested_resource_length == 0 && base_directory_is_root_of_drive)
+    {
+        file_fib.alwaysFF = 0;
+        StartSendingDirectory();
+        return;
+    }
 
     is_directory = false;
 
@@ -761,7 +775,7 @@ static void StartSendingDirectory()
     //the versin with a '/' so that relative links in the files list
     //work as expected.
 
-    if(*requested_resource != '\0' && requested_resource[strlen(requested_resource)-1] != '/')
+    if(requested_resource_length > 0 && requested_resource[requested_resource_length-1] != '/')
     {
         SendResponseStart(308, "Moved Permanently");
         sprintf(output_data_buffer, "Location: http://%i.%i.%i.%i:%u/%s/",
@@ -778,6 +792,7 @@ static void StartSendingDirectory()
         SendResponseStart(200, "Ok");
         SendLineToClient("Content-Type: text/html");
         SendLineToClient("Transfer-Encoding: chunked");
+        SendLineToClient("Cache-Control: private, max-age=" MAX_CACHE_SECS_FOR_DIRECTORY_LISTING);
         SendLineToClient(empty_str);
 
         automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1;
@@ -847,6 +862,7 @@ static void StandarizeSlashes(char* path)
 
 
 #define dir_list_date if_modified_since_date
+#define requesting_root_resource_on_root_of_drive (file_fib.alwaysFF == 0)
 
 static void ContinueSendingDirectory()
 {
@@ -867,7 +883,9 @@ static void ContinueSendingDirectory()
         {
             if(dir_list_fib.alwaysFF == 0)
             {
-                error = SearchFile(&file_fib, &dir_list_fib, true);
+                error = SearchFile(
+                    requesting_root_resource_on_root_of_drive ? (void*)files_base_directory : (void*)&file_fib, 
+                    &dir_list_fib, true);
 
                 dir_name = &filename_buffer[base_directory_length];
                 if(strlen(dir_name) != 1)

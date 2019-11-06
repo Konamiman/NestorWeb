@@ -22,7 +22,7 @@ tcpip.rel: tcpip.c tcpip.h
 	sdcc -c $(COMMON_FLAGS) tcpip.c
 
 http.rel: http.c http.h tcpip.rel utils.rel version.h
-	sdcc -c $(COMMON_FLAGS) utils.rel http.c
+	sdcc -c $(COMMON_FLAGS) http.c
 
 utils.rel: utils.c utils.h
 	sdcc -c $(COMMON_FLAGS) utils.c
