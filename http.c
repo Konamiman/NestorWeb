@@ -30,6 +30,7 @@ static fileInfoBlock file_fib;
 static fileInfoBlock dir_list_fib;
 static bool send_as_attachment;
 static bool has_if_modified_since;
+static dateTime fib_date;
 static dateTime if_modified_since_date;
 static bool directory_listing_enabled;
 static byte base_directory_length;
@@ -105,6 +106,8 @@ static void SendInternalError();
 static void ProcessFileOrDirectoryRequest();
 static void StartSendingFile();
 static void SendContentLengthHeader(ulong length);
+static bool CheckIfModifiedSince();
+static void SendLastModified();
 static void ContinueSendingFile();
 static void StartSendingDirectory();
 static void ContinueSendingDirectoryHeaders();
@@ -644,19 +647,9 @@ static void ProcessFileOrDirectoryRequest()
 static void StartSendingFile()
 {
     byte error;
-    dateTime date_time;
 
-    if(file_fib.dateOfModification != 0)
-    {
-        ParseFibDateTime(&file_fib, &date_time);
-
-        if(has_if_modified_since && CompareDates(&date_time, &if_modified_since_date) <= 0)
-        {
-            SendErrorResponseToClient(304, "Not Modified", null);
-            CloseConnectionToClient();
-            return;
-        }
-    }
+    if(CheckIfModifiedSince())
+        return;
 
     error = OpenFile(&file_fib, &file_handle);
     if(error)
@@ -678,14 +671,7 @@ static void StartSendingFile()
         SendLineToClient(buffer);
     }
 
-    if(file_fib.dateOfModification != 0)
-    {
-        //Note that we already ran ParseFibDateTime earlier
-        ToVerboseDate(buffer2, &date_time);
-        sprintf(buffer, "Last-Modified: %s", buffer2);
-        SendLineToClient(buffer);
-    }
-
+    SendLastModified();
     SendLineToClient(empty_str);
 
     output_data_length = 0;
@@ -701,6 +687,36 @@ static void SendContentLengthHeader(ulong length)
     _ultoa(length, num_buffer, 10);
     sprintf(content_length_buffer, "Content-Length: %s", num_buffer);
     SendLineToClient(content_length_buffer);
+}
+
+
+static bool CheckIfModifiedSince()
+{
+    if(file_fib.dateOfModification != 0)
+    {
+        ParseFibDateTime(&file_fib, &fib_date);
+
+        if(has_if_modified_since && CompareDates(&fib_date, &if_modified_since_date) <= 0)
+        {
+            SendErrorResponseToClient(304, "Not Modified", null);
+            CloseConnectionToClient();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+static void SendLastModified()
+{
+    if(file_fib.dateOfModification != 0)
+    {
+        //Note that we assume that fib_date has been already filled
+        ToVerboseDate(buffer2, &fib_date);
+        sprintf(buffer, "Last-Modified: %s", buffer2);
+        SendLineToClient(buffer);
+    }
 }
 
 
