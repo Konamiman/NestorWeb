@@ -75,7 +75,7 @@ static const char* dir_list_header_2 =
 
 static const char* dir_list_footer = 
     "</table>"
-    "<p><a href=\"http://github.com/Konamiman/NestorHTTP\">NestorHTTP " VERSION "</a></p>"
+    "<p><a href=\"http://github.com/Konamiman/NestorHTTP\" target=\"_blank\">NestorHTTP " VERSION "</a></p>"
     "</body>"
     "</html>";
 
