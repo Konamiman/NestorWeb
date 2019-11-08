@@ -452,8 +452,6 @@ static void SendLineToClient(char* line)
 
 static void SendResponseStart(int statusCode, char* statusMessage)
 {
-    char buffer[64];
-
     if(server_verbose_mode > VERBOSE_MODE_SILENT)
         printf("Response: %i %s\r\n", statusCode, statusMessage);
 
