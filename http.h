@@ -17,10 +17,14 @@ enum HttpAutomatonStates {
     HTTPA_LISTENING,
     HTTPA_READING_REQUEST,
     HTTPA_READING_HEADERS,
-    HTTPA_SENDING_RESPONSE
+    HTTPA_SENDING_FILE_CONTENTS,
+    HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1,
+    HTTPA_SENDING_DIRECTORY_LISTING_HEADER_2,
+    HTTPA_SENDING_DIRECTORY_LISTING_ENTRIES,
+    HTTPA_SENDING_DIRECTORY_LISTING_FOOTER
 };
 
 
-void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, uint port, byte verbose_mode, int inactivity_timeout_in_ticks);
+void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, byte* ip, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing);
 void CleanupHttpAutomaton();
 void DoHttpServerAutomatonStep();

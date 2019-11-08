@@ -86,12 +86,22 @@ bool KeyIsPressed()
 }
 
 
-byte SearchFile(char* fileName, fileInfoBlock* fib, bool include_dirs)
+byte SearchFile(void* fileNameOrFib, fileInfoBlock* fib, bool include_dirs)
 {
-    regs.Words.DE = (int)fileName;
+    regs.Words.DE = (int)fileNameOrFib;
+    if(*((byte*)fileNameOrFib) == 0xFF)
+        regs.Words.HL = (int)"*.*";
     regs.Bytes.B = include_dirs ? FILE_ATTR_DIRECTORY : 0;
     regs.Words.IX = (int)fib;
     DosCall(F_FFIRST, &regs, REGS_ALL, REGS_MAIN);
+    return regs.Bytes.A;
+}
+
+
+byte SearchNextFile(fileInfoBlock* fib)
+{
+    regs.Words.IX = (int)fib;
+    DosCall(F_FNEXT, &regs, REGS_ALL, REGS_MAIN);
     return regs.Bytes.A;
 }
 

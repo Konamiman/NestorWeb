@@ -169,7 +169,7 @@ bool SendDataToTcpConnection(byte* data, int length)
     regs.Bytes.B = connection_id;
     regs.Words.DE = (int)data;
     regs.Words.HL = length;
-    regs.Bytes.C = TCP_SEND_FLAGS_PUSH;
+    regs.Bytes.C = 0; //Not sure if using TCP_SEND_FLAGS_PUSH would be appropriate here
     UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_SEND, &regs, REGS_MAIN, REGS_MAIN);
     
     //Any other error means the connection is in a wrong state and will be handled by the HTTP automaton
