@@ -35,6 +35,7 @@ static bool has_if_modified_since;
 static dateTime fib_date;
 static dateTime if_modified_since_date;
 static bool directory_listing_enabled;
+static bool cgi_enabled;
 static byte base_directory_length;
 static byte buffer[64];
 static byte buffer2[32];
@@ -136,13 +137,14 @@ static void InitializeDataBuffer()
 }
 
 
-void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, byte* ip, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing)
+void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, byte* ip, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing, bool enable_cgi)
 {
     memcpy(server_ip, ip, 4);
     server_port = port;
     server_verbose_mode = verbose_mode;
     client_inactivity_timeout = inactivity_timeout_in_ticks;
     directory_listing_enabled = enable_directory_listing;
+    cgi_enabled = enable_cgi;
 
     files_base_directory = base_directory;
     base_directory_length = strlen(base_directory) - 1;
