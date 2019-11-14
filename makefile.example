@@ -2,8 +2,8 @@
 # are available at konamiman.com
 ALLOCS = 1000 # Higher value = smaller generated file but slower compilation. Recommended for release: 100000
 COMMON_FLAGS = -mz80 --disable-warning 196 --disable-warning 85 --max-allocs-per-node $(ALLOCS) --allow-unsafe-read --opt-code-size
-PROGRAM_FLAGS = --code-loc 0x180 --data-loc 0 --no-std-crt0
-LIBS = crt0msx_msxdos_advanced.rel printf_simple.rel putchar_msxdos.rel asm.lib
+PROGRAM_FLAGS = --code-loc 0x410 --data-loc 0 --no-std-crt0
+LIBS = crt0msx_msxdos2_fork.rel printf_simple.rel putchar_msxdos.rel asm.lib
 
 ifeq ($(OS),Windows_NT)
 	RM = del

@@ -11,3 +11,5 @@ asm.h
 asm.lib
 makefile
 .vscode
+!crt0msx_msxdos2_fork.asm
+

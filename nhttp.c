@@ -7,6 +7,7 @@
 #include "http.h"
 #include "utils.h"
 #include "version.h"
+#include "proc.h"
 
 const char* strTitle = 
     "NestorHTTP " VERSION " - the HTTP server for MSX\r\n"
@@ -193,4 +194,11 @@ void Cleanup()
 
     HideFunctionKeys();
     memcpy(F_KEY_CONTENTS_POINTER(1), function_keys_backup, sizeof(function_keys_backup));
+}
+
+
+byte proc_join(byte error_code_from_subprocess, void* state_data)
+{
+    //Function is required to compile
+    return 0;
 }
