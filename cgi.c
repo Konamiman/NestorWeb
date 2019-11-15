@@ -11,6 +11,7 @@ extern applicationState state;
 extern fileInfoBlock file_fib;
 extern byte buffer[64];
 extern const char* empty_str;
+extern char temp_directory[64];
 
 #define PrintUnlessSilent(s) { if(state.verbosityLevel > VERBOSE_MODE_SILENT) printf(s); }
 

@@ -35,6 +35,9 @@ const char* strHelp =
 applicationState state;
 Z80_registers regs;
 char http_error_buffer[80];
+char temp_directory[64];
+fileInfoBlock file_fib;
+byte buffer[64];
 
 static bool function_keys_were_visible;
 static char function_keys_backup[5 * F_KEY_CONTENTS_LENGTH];
@@ -45,6 +48,7 @@ int ServerMainLoop();
 void InitializeInfoArea(char* ip, uint port);
 void TerminateWithErrorMessage(char* message);
 void Cleanup();
+bool GetTempDirectory();
 
 
 #define ExitRequested() KeyIsPressed()
@@ -148,6 +152,9 @@ void Initialize()
     InitializeTcpIpUnapi();
     CHECK(TcpIpSupportsPassiveTcpConnections, "The TCP/IP UNAPI implementation doesn't support passive TCP connections");
 
+    if(state.cgiEnabled && !GetTempDirectory())
+        TerminateWithErrorMessage("Invalid temporary directory (in NHTTP_TEMP or TEMP environment item)");
+
     DisableDiskErrorPrompt();
     AbortAllTransientTcpConnections();
 
@@ -158,6 +165,8 @@ void Initialize()
     printf("Base directory: %s\r\n", state.baseDirectory);
     printf("Directory listing is %s\r\n", state.directoryListingEnabled ? "ON" : "OFF");
     printf("CGI support is %s\r\n", state.cgiEnabled ? "ON" : "OFF");
+    if(state.cgiEnabled)
+        printf("Temporary directory for CGI: %s\r\n", temp_directory);
     printf("Listening on %i.%i.%i.%i:%u\r\n", state.localIp[0], state.localIp[1], state.localIp[2], state.localIp[3], state.tcpPort);
     printf("Press any key to exit\r\n\r\n");
 
@@ -206,4 +215,71 @@ byte proc_join(byte error_code_from_subprocess, void* state_data)
     ReinitializeTcpIpUnapi();
     ReinitializeHttpAutomaton(error_code_from_subprocess);
     return ServerMainLoop();
+}
+
+
+bool GetTempDirectory()
+{
+    char* pointer_to_last_item;
+    byte error;
+    byte parse_flags;
+    byte len;
+    byte drive;
+    char* pointer_to_terminator;
+
+    if(!GetEnvironmentItem("NHTTP_TEMP", temp_directory))
+    {
+        if(!GetEnvironmentItem("TEMP", temp_directory))
+        {
+            GetEnvironmentItem("PROGRAM", temp_directory);
+            pointer_to_last_item = GetPointerToLastItemOfPathname(temp_directory, null, null, null);
+            *pointer_to_last_item = '\0';
+            return true;
+        }
+    }
+
+    pointer_to_last_item = GetPointerToLastItemOfPathname(temp_directory, &parse_flags, &drive, &pointer_to_terminator);
+    if(!pointer_to_last_item)
+        return false;
+
+    if(parse_flags & (PARSE_FLAGS_IS_AMBIGUOUS | PARSE_FLAGS_IS_DOT))
+    {
+        return false;
+    }
+    
+    len = (byte)(pointer_to_terminator - temp_directory);
+    if((parse_flags & PARSE_FLAGS_HAS_DRIVE) && len < 4)
+    {
+        //Root directory of a drive, validate by trying to search something
+        error = SearchFile(temp_directory, &file_fib, true);
+        if(error != 0 && error != ERR_NOFIL)
+            return false;
+        
+        sprintf(temp_directory, "%c:\\", drive + 'A' - 1);
+        return true;
+    }
+
+    //Must exist and be a directory
+    error = SearchFile(temp_directory, &file_fib, true);
+    if(error || (file_fib.attributes & FILE_ATTR_DIRECTORY) == 0)
+        return false;
+
+    //Normalize to drive:\full_path
+    sprintf(temp_directory, "%c:\\", file_fib.logicalDrive + 'A' - 1);
+    regs.Words.DE = (int)(&temp_directory[3]);
+    DosCall(F_WPATH, &regs, REGS_MAIN, REGS_NONE);
+
+    pointer_to_last_item = GetPointerToLastItemOfPathname(temp_directory, null, null, pointer_to_terminator);
+    if(parse_flags & PARSE_FLAGS_HAS_FILENAME)
+    {
+        pointer_to_terminator[0] = '\\';
+        pointer_to_terminator[1] = '\0';
+    }
+    else
+    {
+        //If value already finished with "\", the result of _WPATH will end with "????????.???"
+        *pointer_to_last_item = '\0';
+    }
+
+    return true;
 }

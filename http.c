@@ -14,9 +14,8 @@
 
 extern applicationState state;
 extern char http_error_buffer[80];
-
-fileInfoBlock file_fib;
-byte buffer[64];
+extern fileInfoBlock file_fib;
+extern byte buffer[64];
 
 static byte automaton_state;
 static byte data_buffer[256+1];

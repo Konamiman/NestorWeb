@@ -19,6 +19,15 @@
 
 #define F_KEY_CONTENTS_POINTER(key) ((char*)FNKSTR + ((key)-1)*F_KEY_CONTENTS_LENGTH)
 
+#define STDIN 0
+#define STDOUT 1
+
+#define PARSE_FLAGS_HAS_DIRECTORY (1 << 1)
+#define PARSE_FLAGS_HAS_DRIVE (1 << 2)
+#define PARSE_FLAGS_HAS_FILENAME (1 << 3)
+#define PARSE_FLAGS_IS_AMBIGUOUS (1 << 5)
+#define PARSE_FLAGS_IS_DOT (1 << 6)
+
 bool MsxDos2IsRunning();
 void TerminateWithErrorCode(byte errorCode);
 byte NormalizeDirectory(char* directoryPath, char* normalizedDirectoryPath);
@@ -33,5 +42,9 @@ bool FunctionKeysAreVisible();
 void DisplayFunctionKeys();
 void HideFunctionKeys();
 void SetFunctionKeyContents(int key, char* contents);
+bool GetEnvironmentItem(const char* name, char* value);
+byte SetEnvironmentItem(const char* name, char* value);
+void FindEnvironmentItem(uint index, char* name);
+char* GetPointerToLastItemOfPathname(const char* pathname, byte* parse_flags, byte* drive, char** pointer_to_last_item);
 
 #endif

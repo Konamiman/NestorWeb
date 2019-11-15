@@ -199,3 +199,44 @@ void SetFunctionKeyContents(int key, char* contents)
 	    strcpy(F_KEY_CONTENTS_POINTER(key), contents);
 }
 
+
+bool GetEnvironmentItem(const char* name, char* value)
+{
+    regs.Words.HL = (int)name;
+    regs.Words.DE = (int)value;
+    regs.Bytes.B = 255;
+    DosCall(F_GENV, &regs, REGS_MAIN, REGS_NONE);
+    return *value != '\0';
+}
+
+
+byte SetEnvironmentItem(const char* name, const char* value)
+{
+    regs.Words.HL = (int)name;
+    regs.Words.DE = (int)value;
+    DosCall(F_SENV, &regs, REGS_MAIN, REGS_AF);
+    return regs.Bytes.A;
+}
+
+
+void FindEnvironmentItem(uint index, char* name)
+{
+    regs.UWords.DE = index;
+    regs.Words.HL = (int)name;
+    DosCall(F_FENV, &regs, REGS_MAIN, REGS_NONE);
+}
+
+
+char* GetPointerToLastItemOfPathname(const char* pathname, byte* parse_flags, byte* drive, char** pointer_to_last_item)
+{
+    regs.Bytes.B = 0;
+    regs.Words.DE = (int)pathname;
+    DosCall(F_PARSE, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A != 0)
+        return null;
+    
+    if(parse_flags) *parse_flags = regs.Bytes.B;
+    if(drive) *drive = regs.Bytes.C;
+    if(pointer_to_last_item) *pointer_to_last_item = (char*)regs.Words.DE;
+    return (char*)regs.Words.HL;
+}
