@@ -7,12 +7,16 @@
 #include "utils.h"
 #include "msxdos.h"
 #include "proc.h"
+#include "cgi.h"
 #include <string.h>
 
 #define MAX_CACHE_SECS_FOR_DIRECTORY_LISTING "3600"
 
 extern applicationState state;
 extern char http_error_buffer[80];
+
+fileInfoBlock file_fib;
+byte buffer[64];
 
 static byte automaton_state;
 static byte data_buffer[256+1];
@@ -26,18 +30,15 @@ static int output_data_length;
 static char filename_buffer[MAX_FILE_PATH_LEN*2];
 static bool base_directory_is_root_of_drive;
 static byte file_handle;
-static fileInfoBlock file_fib;
 static fileInfoBlock dir_list_fib;
 static bool send_as_attachment;
 static bool has_if_modified_since;
 static dateTime fib_date;
 static dateTime if_modified_since_date;
 static byte base_directory_length;
-static byte buffer[64];
 static byte buffer2[32];
 static byte requested_resource[MAX_FILE_PATH_LEN+1];
 static int requested_resource_length;
-static byte error_code_from_cgi;
 static bool must_run_cgi;
 
 static char num_buffer[11];
@@ -85,12 +86,11 @@ static const char* dir_list_entry =
     "<td>%s</td>"
     "</tr>";
 
-static const char* empty_str = "";
+const char* empty_str = "";
 
 static void InitializeDataBuffer();
 static void OpenServerConnection();
 static void HandleIncomingConnectionIfAvailable();
-static void CloseConnectionToClient();
 static void ContinueReadingRequest();
 static bool ProcessRequestLine();
 static bool ContinueReadingLine();
@@ -98,16 +98,12 @@ static void ResetInactivityCounter();
 static void UpdateInactivityCounter();
 static void ContinueReadingHeaders();
 static void ProcessHeader();
-static void SendLineToClient(char* line);
-static void SendResponseStart(int statusCode, char* statusMessage);
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
 static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
 static char* ConvertRequestToFilename(char** query_string_start, char** resource_start);
 static void SendNotFoundError();
-static void SendInternalError();
 static void ProcessFileOrDirectoryRequest();
 static void StartSendingFile();
-static void SendContentLengthHeader(ulong length);
 static bool CheckIfModifiedSince();
 static void SendLastModified();
 static void ContinueSendingFile();
@@ -120,8 +116,6 @@ static void SendParentDirectoryLink(char* dir_name);
 static void RemoveLastPartOfPath(char* path);
 static void FinishSendingDirectory();
 static void PrepareChunkedData(char* data);
-static void RunCgi();
-static void SendResultAfterCgi();
 
 extern void _ultoa(long val, char* buffer, char base);
 
@@ -158,13 +152,11 @@ void ReinitializeHttpAutomaton(byte errorCodeFromCgi)
 {
     InitializeHttpAutomatonData();
     
-    error_code_from_cgi = errorCodeFromCgi;
-
     if(state.verbosityLevel > VERBOSE_MODE_SILENT)
-        printf("CGI script returned error code %i\r\n", error_code_from_cgi);
+        printf("CGI script returned error code %i\r\n", errorCodeFromCgi);
 
     automaton_state = HTTPA_SENDING_RESULT_AFTER_CGI;
-    SendResultAfterCgi();
+    SendResultAfterCgi(errorCodeFromCgi);
 }
 
 
@@ -210,9 +202,6 @@ void DoHttpServerAutomatonStep()
             break;
         case HTTPA_SENDING_DIRECTORY_LISTING_FOOTER:
             FinishSendingDirectory();
-            break;
-        case HTTPA_SENDING_RESULT_AFTER_CGI:
-            SendResultAfterCgi();
             break;
     }
 }
@@ -265,7 +254,7 @@ static void HandleIncomingConnectionIfAvailable()
 }
 
 
-static void CloseConnectionToClient()
+void CloseConnectionToClient()
 {
     ResetInactivityCounter();
     automaton_state = HTTPA_NONE;
@@ -458,7 +447,7 @@ static void ProcessHeader()
 }
 
 
-static void SendLineToClient(char* line)
+void SendLineToClient(char* line)
 {
     sprintf(data_buffer, "%s\r\n", line);
     if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
@@ -468,7 +457,7 @@ static void SendLineToClient(char* line)
 }
 
 
-static void SendResponseStart(int statusCode, char* statusMessage)
+void SendResponseStart(int statusCode, char* statusMessage)
 {
     if(state.verbosityLevel > VERBOSE_MODE_SILENT)
         printf("Response: %i %s\r\n", statusCode, statusMessage);
@@ -607,7 +596,7 @@ static void SendNotFoundError()
 }
 
 
-static void SendInternalError()
+void SendInternalError()
 {
     SendErrorResponseToClient(500, "Internal Server Error", "Sorry, something went wrong. It's not you, it's me.");
 }
@@ -715,7 +704,7 @@ static void StartSendingFile()
 }
 
 
-static void SendContentLengthHeader(ulong length)
+void SendContentLengthHeader(ulong length)
 {
     _ultoa(length, num_buffer, 10);
     sprintf(content_length_buffer, "Content-Length: %s", num_buffer);
@@ -1021,31 +1010,4 @@ static void PrepareChunkedData(char* data)
 {
     sprintf(output_data_buffer, "%x\r\n%s\r\n", strlen(data), data);
     output_data_length = strlen(output_data_buffer);
-}
-
-
-void RunCgi()
-{
-    byte error;
-
-    PrintUnlessSilent("Running CGI script\r\n");
-    error = proc_fork(&file_fib, null, &state);
-
-    if(state.verbosityLevel > VERBOSE_MODE_SILENT)
-        printf("*** Error running CGI script: %i\r\n", error);
-
-    SendInternalError();
-    CloseConnectionToClient();
-}
-
-
-void SendResultAfterCgi()
-{
-    SendResponseStart(200, "Ok");
-    SendLineToClient("Content-type: text/plain");
-    sprintf(buffer, "Error code from CGI script: %i", error_code_from_cgi);
-    SendContentLengthHeader(strlen(buffer));
-    SendLineToClient(empty_str);
-    SendStringToTcpConnection(buffer);
-    CloseConnectionToClient();
 }

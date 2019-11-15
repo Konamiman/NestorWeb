@@ -29,4 +29,10 @@ enum HttpAutomatonStates {
 void InitializeHttpAutomaton();
 void ReinitializeHttpAutomaton(byte errorCodeFromCgi);
 void CleanupHttpAutomaton();
+
 void DoHttpServerAutomatonStep();
+void SendInternalError();
+void CloseConnectionToClient();
+void SendResponseStart(int statusCode, char* statusMessage);
+void SendLineToClient(char* line);
+void SendContentLengthHeader(ulong length);
