@@ -6,12 +6,15 @@
 #include "version.h"
 #include "utils.h"
 #include "msxdos.h"
+#include "proc.h"
 #include <string.h>
 
 #define MAX_CACHE_SECS_FOR_DIRECTORY_LISTING "3600"
 
+extern applicationState state;
+extern char http_error_buffer[80];
+
 static byte automaton_state;
-static char* error_buffer;
 static byte data_buffer[256+1];
 static byte* data_buffer_pointer;
 static int data_buffer_length;
@@ -20,12 +23,7 @@ static int last_system_timer_value;
 static int ticks_without_data;
 static byte output_data_buffer[512];
 static int output_data_length;
-static byte server_ip[4];
-static int server_port;
-static bool server_verbose_mode;
-static int client_inactivity_timeout;
 static char filename_buffer[MAX_FILE_PATH_LEN*2];
-static char* files_base_directory;
 static bool base_directory_is_root_of_drive;
 static byte file_handle;
 static fileInfoBlock file_fib;
@@ -34,13 +32,13 @@ static bool send_as_attachment;
 static bool has_if_modified_since;
 static dateTime fib_date;
 static dateTime if_modified_since_date;
-static bool directory_listing_enabled;
-static bool cgi_enabled;
 static byte base_directory_length;
 static byte buffer[64];
 static byte buffer2[32];
 static byte requested_resource[MAX_FILE_PATH_LEN+1];
 static int requested_resource_length;
+static byte error_code_from_cgi;
+static bool must_run_cgi;
 
 static char num_buffer[11];
 static char content_length_buffer[32];
@@ -104,7 +102,7 @@ static void SendLineToClient(char* line);
 static void SendResponseStart(int statusCode, char* statusMessage);
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
 static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
-static char* ConvertRequestToFilename(char** query_string_start);
+static char* ConvertRequestToFilename(char** query_string_start, char** resource_start);
 static void SendNotFoundError();
 static void SendInternalError();
 static void ProcessFileOrDirectoryRequest();
@@ -122,10 +120,12 @@ static void SendParentDirectoryLink(char* dir_name);
 static void RemoveLastPartOfPath(char* path);
 static void FinishSendingDirectory();
 static void PrepareChunkedData(char* data);
+static void RunCgi();
+static void SendResultAfterCgi();
 
 extern void _ultoa(long val, char* buffer, char base);
 
-#define PrintUnlessSilent(s) { if(server_verbose_mode > VERBOSE_MODE_SILENT) printf(s); }
+#define PrintUnlessSilent(s) { if(state.verbosityLevel > VERBOSE_MODE_SILENT) printf(s); }
 
 
 static void InitializeDataBuffer()
@@ -137,36 +137,47 @@ static void InitializeDataBuffer()
 }
 
 
-void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, byte* ip, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing, bool enable_cgi)
+void InitializeHttpAutomatonData()
 {
-    memcpy(server_ip, ip, 4);
-    server_port = port;
-    server_verbose_mode = verbose_mode;
-    client_inactivity_timeout = inactivity_timeout_in_ticks;
-    directory_listing_enabled = enable_directory_listing;
-    cgi_enabled = enable_cgi;
-
-    files_base_directory = base_directory;
-    base_directory_length = strlen(base_directory) - 1;
+    base_directory_length = strlen(state.baseDirectory) - 1;
     base_directory_is_root_of_drive = base_directory_length < 3;
-    error_buffer = http_error_buffer;
-    error_buffer[0] = '\0';
-
+    http_error_buffer[0] = '\0';
     file_handle = 0;
-    automaton_state = HTTPA_NONE;
+    ResetInactivityCounter();
+}
+
+
+void InitializeHttpAutomaton()
+{
+    InitializeHttpAutomatonData();
+    CloseConnectionToClient();
+}
+
+
+void ReinitializeHttpAutomaton(byte errorCodeFromCgi)
+{
+    InitializeHttpAutomatonData();
+    
+    error_code_from_cgi = errorCodeFromCgi;
+
+    if(state.verbosityLevel > VERBOSE_MODE_SILENT)
+        printf("CGI script returned error code %i\r\n", error_code_from_cgi);
+
+    automaton_state = HTTPA_SENDING_RESULT_AFTER_CGI;
+    SendResultAfterCgi();
 }
 
 
 void CleanupHttpAutomaton()
 {
-    server_verbose_mode = VERBOSE_MODE_SILENT;
+    state.verbosityLevel = VERBOSE_MODE_SILENT;
     CloseConnectionToClient();
 }
 
 
 void DoHttpServerAutomatonStep()
 {
-    if(ticks_without_data >= client_inactivity_timeout)
+    if(ticks_without_data >= state.inactivityTimeout)
     {
         PrintUnlessSilent("Closing connection for client inactivity\r\n");
 
@@ -200,6 +211,9 @@ void DoHttpServerAutomatonStep()
         case HTTPA_SENDING_DIRECTORY_LISTING_FOOTER:
             FinishSendingDirectory();
             break;
+        case HTTPA_SENDING_RESULT_AFTER_CGI:
+            SendResultAfterCgi();
+            break;
     }
 }
 
@@ -208,15 +222,15 @@ static void OpenServerConnection()
 {
     byte error;
 
-    error = OpenPassiveTcpConnection(server_port);
+    error = OpenPassiveTcpConnection(state.tcpPort);
     if(error == ERR_NO_NETWORK)
     {
-        sprintf(error_buffer, "No network connection");
+        sprintf(http_error_buffer, "No network connection");
         return;
     }
     else if(error != 0)
     {
-        sprintf(error_buffer, "Unexpected error when opening TCP connection: %i", error);
+        sprintf(http_error_buffer, "Unexpected error when opening TCP connection: %i", error);
         return;
     }
 
@@ -309,8 +323,9 @@ static bool ProcessRequestLine()
 {
     char* converted_filename;
     char* query_string;
+    char* resource_name_start;
 
-    if(server_verbose_mode > VERBOSE_MODE_SILENT)
+    if(state.verbosityLevel > VERBOSE_MODE_SILENT)
         printf("Request: %s\r\n", data_buffer);
 
     if(strlen(data_buffer) == sizeof(data_buffer)-1)
@@ -325,12 +340,13 @@ static bool ProcessRequestLine()
         return false;
     }
 
-    converted_filename = ConvertRequestToFilename(&query_string);
+    converted_filename = ConvertRequestToFilename(&query_string, &resource_name_start);
     send_as_attachment = query_string && strncmpi(query_string, "a=1", 3);
 
     if(converted_filename)
     {
-        strcpy(filename_buffer, files_base_directory);
+        must_run_cgi = state.cgiEnabled && strncmpi(resource_name_start, "CGI-BIN", 7);
+        strcpy(filename_buffer, state.baseDirectory);
         strcat(filename_buffer, converted_filename);
         return true;
     }
@@ -430,7 +446,7 @@ static void ContinueReadingHeaders()
 
 static void ProcessHeader()
 {
-    if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
+    if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
         printf("<-- %s\r\n", data_buffer);
 
     if(strncmpi(data_buffer, "If-Modified-Since:", 18))
@@ -445,7 +461,7 @@ static void ProcessHeader()
 static void SendLineToClient(char* line)
 {
     sprintf(data_buffer, "%s\r\n", line);
-    if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
+    if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
         printf("--> %s", data_buffer);
 
     SendStringToTcpConnection(data_buffer);
@@ -454,7 +470,7 @@ static void SendLineToClient(char* line)
 
 static void SendResponseStart(int statusCode, char* statusMessage)
 {
-    if(server_verbose_mode > VERBOSE_MODE_SILENT)
+    if(state.verbosityLevel > VERBOSE_MODE_SILENT)
         printf("Response: %i %s\r\n", statusCode, statusMessage);
 
     sprintf(buffer, "HTTP/1.1 %i %s", statusCode, statusMessage);
@@ -479,7 +495,7 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
     {
         SendLineToClient("Content-Type: text/html");
         SendLineToClient(empty_str);
-        if(server_verbose_mode > VERBOSE_MODE_CONNECTIONS)
+        if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
             printf("--> (HTML response)\r\n");
         SendStringToTcpConnection(content);
     }
@@ -520,7 +536,7 @@ static void SendErrorResponseToClient(int statusCode, char* statusMessage, char*
 }
 
 
-static char* ConvertRequestToFilename(char** query_string_start)
+static char* ConvertRequestToFilename(char** query_string_start, char** resource_start)
 {
     char* pointer;
     char* start_pointer;
@@ -536,6 +552,7 @@ static char* ConvertRequestToFilename(char** query_string_start)
     while(*pointer != ' ') pointer++;
     while(*pointer == ' ') pointer++;
     if(*pointer == '/') pointer++;
+    *resource_start = pointer;
 
     start_pointer = pointer;
     requested_resource_pointer = requested_resource;
@@ -580,7 +597,7 @@ static char* ConvertRequestToFilename(char** query_string_start)
 
     *pointer = '\0';
     
-    return start_pointer == pointer && !directory_listing_enabled ? default_document+1 : start_pointer;
+    return start_pointer == pointer && !state.directoryListingEnabled ? default_document+1 : start_pointer;
 }
 
 
@@ -605,7 +622,7 @@ static void ProcessFileOrDirectoryRequest()
     //We need to treat requesting the root resource + the base directory being the root of the drive
     //as a special case, since in this case we can't search for the directory itself
     //(doing that would return the first file in the directory instead).
-    if(directory_listing_enabled && requested_resource_length == 0 && base_directory_is_root_of_drive)
+    if(state.directoryListingEnabled && requested_resource_length == 0 && base_directory_is_root_of_drive)
     {
         file_fib.alwaysFF = 0;
         StartSendingDirectory();
@@ -618,7 +635,7 @@ static void ProcessFileOrDirectoryRequest()
 
     if(error == 0 && (file_fib.attributes & FILE_ATTR_DIRECTORY))
     {
-        if(directory_listing_enabled)
+        if(state.directoryListingEnabled)
         {
             is_directory = true;
         }
@@ -637,7 +654,7 @@ static void ProcessFileOrDirectoryRequest()
     }
     else if(error >= MIN_DISK_ERROR_CODE || error == ERR_NHAND || error == ERR_NORAM)
     {
-        if(server_verbose_mode > VERBOSE_MODE_SILENT)
+        if(state.verbosityLevel > VERBOSE_MODE_SILENT)
             printf("*** Error searching file: %xh\r\n", error);
 
         SendInternalError();
@@ -653,6 +670,8 @@ static void ProcessFileOrDirectoryRequest()
 
     if(is_directory)
         StartSendingDirectory();
+    else if(must_run_cgi && !(state.directoryListingEnabled && send_as_attachment))
+        RunCgi();
     else
         StartSendingFile();
 }
@@ -668,7 +687,7 @@ static void StartSendingFile()
     error = OpenFile(&file_fib, &file_handle);
     if(error)
     {
-        if(server_verbose_mode > VERBOSE_MODE_SILENT)
+        if(state.verbosityLevel > VERBOSE_MODE_SILENT)
             printf("*** Error opening file: %xh\r\n", error);
 
         SendInternalError();
@@ -753,7 +772,7 @@ static void ContinueSendingFile()
             error = ReadFromFile(file_handle, output_data_buffer, &output_data_length);
             if(error != 0)
             {
-                if(error != ERR_EOF && server_verbose_mode > VERBOSE_MODE_SILENT)
+                if(error != ERR_EOF && state.verbosityLevel > VERBOSE_MODE_SILENT)
                     printf("*** Error reading file: %xh\r\n", error);
 
                 CloseConnectionToClient();
@@ -779,8 +798,8 @@ static void StartSendingDirectory()
     {
         SendResponseStart(308, "Moved Permanently");
         sprintf(output_data_buffer, "Location: http://%i.%i.%i.%i:%u/%s/",
-            server_ip[0], server_ip[1], server_ip[2], server_ip[3],
-            server_port,
+            state.localIp[0], state.localIp[1], state.localIp[2], state.localIp[3],
+            state.tcpPort,
             requested_resource);
         SendLineToClient(output_data_buffer);
         SendLineToClient(empty_str);
@@ -884,7 +903,7 @@ static void ContinueSendingDirectory()
             if(dir_list_fib.alwaysFF == 0)
             {
                 error = SearchFile(
-                    requesting_root_resource_on_root_of_drive ? (void*)files_base_directory : (void*)&file_fib, 
+                    requesting_root_resource_on_root_of_drive ? (void*)state.baseDirectory : (void*)&file_fib, 
                     &dir_list_fib, true);
 
                 dir_name = &filename_buffer[base_directory_length];
@@ -905,7 +924,7 @@ static void ContinueSendingDirectory()
             }
             else if(error != 0)
             {
-                if(server_verbose_mode > VERBOSE_MODE_SILENT)
+                if(state.verbosityLevel > VERBOSE_MODE_SILENT)
                     printf("*** Error retrieving directory contents: %xh\r\n", error);
                 CloseConnectionToClient();
                 return;
@@ -1002,4 +1021,31 @@ static void PrepareChunkedData(char* data)
 {
     sprintf(output_data_buffer, "%x\r\n%s\r\n", strlen(data), data);
     output_data_length = strlen(output_data_buffer);
+}
+
+
+void RunCgi()
+{
+    byte error;
+
+    PrintUnlessSilent("Running CGI script\r\n");
+    error = proc_fork(&file_fib, null, &state);
+
+    if(state.verbosityLevel > VERBOSE_MODE_SILENT)
+        printf("*** Error running CGI script: %i\r\n", error);
+
+    SendInternalError();
+    CloseConnectionToClient();
+}
+
+
+void SendResultAfterCgi()
+{
+    SendResponseStart(200, "Ok");
+    SendLineToClient("Content-type: text/plain");
+    sprintf(buffer, "Error code from CGI script: %i", error_code_from_cgi);
+    SendContentLengthHeader(strlen(buffer));
+    SendLineToClient(empty_str);
+    SendStringToTcpConnection(buffer);
+    CloseConnectionToClient();
 }

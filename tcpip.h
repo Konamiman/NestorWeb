@@ -62,6 +62,7 @@ typedef struct {
 
 bool TcpIpUnapiIsAvailable();
 void InitializeTcpIpUnapi();
+void ReinitializeTcpIpUnapi();
 bool TcpIpSupportsPassiveTcpConnections();
 void GetLocalIpAddress(byte* buffer);
 void LetTcpipBreathe();

@@ -6,7 +6,7 @@
 #include "stdio.h"
 
 
-static Z80_registers regs;
+extern Z80_registers regs;
 static fileInfoBlock fib;
 
 

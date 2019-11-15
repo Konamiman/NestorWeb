@@ -31,18 +31,17 @@ const char* strHelp =
     "Files are sent as attachments if \"?a=1\" is added to the request.\r\n"
     "\r\n";
 
-char base_directory[64];
+
+applicationState state;
+Z80_registers regs;
 char http_error_buffer[80];
-uint port;
-int verbose_mode;
-int inactivity_timeout;
-bool directory_listing_enabled;
-bool function_keys_were_visible;
-bool cgi_enabled;
-char function_keys_backup[5 * F_KEY_CONTENTS_LENGTH];
+
+static bool function_keys_were_visible;
+static char function_keys_backup[5 * F_KEY_CONTENTS_LENGTH];
 
 void ProcessArguments(char** argv, int argc);
 void Initialize();
+int ServerMainLoop();
 void InitializeInfoArea(char* ip, uint port);
 void TerminateWithErrorMessage(char* message);
 void Cleanup();
@@ -58,6 +57,12 @@ int main(char** argv, int argc)
     ProcessArguments(argv, argc);
     Initialize();
 
+    return ServerMainLoop();
+}
+
+
+int ServerMainLoop()
+{
     while(!ExitRequested())
     {
         DoHttpServerAutomatonStep();
@@ -88,42 +93,42 @@ void ProcessArguments(char** argv, int argc)
         TerminateWithErrorCode(0);
     }
 
-    error = NormalizeDirectory(argv[0] , base_directory);
+    error = NormalizeDirectory(argv[0] , state.baseDirectory);
     if(error != 0)
         TerminateWithErrorCode(error);
 
-    port = HTTP_DEFAULT_SERVER_PORT;
-    verbose_mode = VERBOSE_MODE_CONNECTIONS;
-    inactivity_timeout = DEFAULT_INACTIVITY_TIMEOUT_SECS;
-    directory_listing_enabled = false;
-    cgi_enabled = true;
+    state.tcpPort = HTTP_DEFAULT_SERVER_PORT;
+    state.verbosityLevel = VERBOSE_MODE_CONNECTIONS;
+    state.inactivityTimeout = DEFAULT_INACTIVITY_TIMEOUT_SECS;
+    state.directoryListingEnabled = false;
+    state.cgiEnabled = true;
 
     for(i = 1; i<argc; i++)
     {
         c = ToLower(argv[i][0]);
         if(c == 'p')
         {
-            port = (uint)atoi(&argv[i][2]);
-            if(port == 0 || port > MAX_USABLE_TCP_PORT)
+            state.tcpPort = (uint)atoi(&argv[i][2]);
+            if(state.tcpPort == 0 || state.tcpPort > MAX_USABLE_TCP_PORT)
                 TerminateWithErrorMessage("Port number must be between 1 and " MAX_USABLE_TCP_PORT_STR);
         }
         else if(c == 'v')
         {
-            verbose_mode = ((byte)argv[i][2]-'0');
+            state.verbosityLevel = ((byte)argv[i][2]-'0');
         }
         else if(c == 'd')
         {
-            directory_listing_enabled = ((byte)argv[i][2]-'0') != 0;
+            state.directoryListingEnabled = ((byte)argv[i][2]-'0') != 0;
         }
         else if(c == 't')
         {
-            inactivity_timeout = (uint)atoi(&argv[i][2]);
-            if(inactivity_timeout == 0)
+            state.inactivityTimeout = (uint)atoi(&argv[i][2]) * SYSTEM_TIMER_TICKS_PER_SECOND;
+            if(state.inactivityTimeout == 0)
                 TerminateWithErrorMessage("Inactivity timeout must be at least 1");
         }
         else if(c == 'c')
         {
-            cgi_enabled = ((byte)argv[i][2]-'0') != 0;
+            state.cgiEnabled = ((byte)argv[i][2]-'0') != 0;
         }
         else
         {
@@ -137,8 +142,6 @@ void ProcessArguments(char** argv, int argc)
 
 void Initialize()
 {
-    byte ip[4];
-
     CHECK(MsxDos2IsRunning, "MSX-DOS 2 required");
 
     CHECK(TcpIpUnapiIsAvailable, "No TCP/IP UNAPI implementations found");
@@ -148,19 +151,19 @@ void Initialize()
     DisableDiskErrorPrompt();
     AbortAllTransientTcpConnections();
 
-    GetLocalIpAddress(ip);
-    if(*(long*)ip == 0)
+    GetLocalIpAddress(state.localIp);
+    if(*(long*)state.localIp == 0)
         TerminateWithErrorMessage("Local IP address is not configured");
 
-    printf("Base directory: %s\r\n", base_directory);
-    printf("Directory listing is %s\r\n", directory_listing_enabled ? "ON" : "OFF");
-    printf("CGI support is %s\r\n", cgi_enabled ? "ON" : "OFF");
-    printf("Listening on %i.%i.%i.%i:%u\r\n", ip[0], ip[1], ip[2], ip[3], port);
+    printf("Base directory: %s\r\n", state.baseDirectory);
+    printf("Directory listing is %s\r\n", state.directoryListingEnabled ? "ON" : "OFF");
+    printf("CGI support is %s\r\n", state.cgiEnabled ? "ON" : "OFF");
+    printf("Listening on %i.%i.%i.%i:%u\r\n", state.localIp[0], state.localIp[1], state.localIp[2], state.localIp[3], state.tcpPort);
     printf("Press any key to exit\r\n\r\n");
 
-    InitializeInfoArea(ip, port);
+    InitializeInfoArea(state.localIp, state.tcpPort);
 
-    InitializeHttpAutomaton(base_directory, http_error_buffer, ip, port, verbose_mode, inactivity_timeout * SYSTEM_TIMER_TICKS_PER_SECOND, directory_listing_enabled, cgi_enabled);
+    InitializeHttpAutomaton();
 }
 
 
@@ -178,8 +181,8 @@ void InitializeInfoArea(char* ip, uint port)
     SetFunctionKeyContents(4, null);
     SetFunctionKeyContents(5, null);
     DisplayFunctionKeys();
-
 }
+
 
 void TerminateWithErrorMessage(char* message)
 {
@@ -199,6 +202,8 @@ void Cleanup()
 
 byte proc_join(byte error_code_from_subprocess, void* state_data)
 {
-    //Function is required to compile
-    return 0;
+    memcpy(&state, state_data, sizeof(applicationState));
+    ReinitializeTcpIpUnapi();
+    ReinitializeHttpAutomaton(error_code_from_subprocess);
+    return ServerMainLoop();
 }

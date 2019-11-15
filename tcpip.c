@@ -5,11 +5,10 @@
 #include <string.h>
 
 
-static unapi_code_block tcpip_unapi_code_block;
-static const char* tcpip_unapi_identifier = "TCP/IP";
-static Z80_registers regs;
-static byte connection_id;
+extern applicationState state;
+extern Z80_registers regs;
 
+static const char* tcpip_unapi_identifier = "TCP/IP";
 static byte data_buffer[512];
 static byte* data_buffer_pointer;
 static int data_buffer_length;
@@ -23,8 +22,14 @@ bool TcpIpUnapiIsAvailable()
 
 void InitializeTcpIpUnapi()
 {
-    UnapiBuildCodeBlock(tcpip_unapi_identifier, 1, &tcpip_unapi_code_block);
-    connection_id = 0;
+    UnapiBuildCodeBlock(tcpip_unapi_identifier, 1, &state.unapiCodeBlock);
+    state.tcpConnectionNumber = 0;
+    data_buffer_length = 0;
+}
+
+
+void ReinitializeTcpIpUnapi()
+{
     data_buffer_length = 0;
 }
 
@@ -32,7 +37,7 @@ void InitializeTcpIpUnapi()
 bool TcpIpSupportsPassiveTcpConnections()
 {
     regs.Bytes.B = 1;
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_GET_CAPAB, &regs, REGS_MAIN, REGS_MAIN);
+    UnapiCall(&state.unapiCodeBlock, TCPIP_GET_CAPAB, &regs, REGS_MAIN, REGS_MAIN);
     return regs.Bytes.L & TCPIP_CAPAB_OPEN_TCP_PASSIVE_CONN_WITH_NO_REMOTE_SOCKET != 0;
 }
 
@@ -40,7 +45,7 @@ bool TcpIpSupportsPassiveTcpConnections()
 void GetLocalIpAddress(byte* buffer)
 {
     regs.Bytes.B = 1;
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_GET_IPINFO, &regs, REGS_MAIN, REGS_MAIN);
+    UnapiCall(&state.unapiCodeBlock, TCPIP_GET_IPINFO, &regs, REGS_MAIN, REGS_MAIN);
     buffer[0] = regs.Bytes.L;
     buffer[1] = regs.Bytes.H;
     buffer[2] = regs.Bytes.E;
@@ -50,19 +55,19 @@ void GetLocalIpAddress(byte* buffer)
 
 void LetTcpipBreathe()
 {
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_WAIT, &regs, REGS_NONE, REGS_NONE);
+    UnapiCall(&state.unapiCodeBlock, TCPIP_WAIT, &regs, REGS_NONE, REGS_NONE);
 }
 
 
 void AbortAllTransientTcpConnections()
 {
     regs.Bytes.B = 0;
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_ABORT, &regs, REGS_MAIN, REGS_NONE);
-    connection_id = 0;
+    UnapiCall(&state.unapiCodeBlock, TCPIP_TCP_ABORT, &regs, REGS_MAIN, REGS_NONE);
+    state.tcpConnectionNumber = 0;
 }
 
 
-static byte _OpenPassiveTcpConnection(byte* connection_id, uint port)
+static byte _OpenPassiveTcpConnection(byte* tcpConnectionNumber, uint port)
 {
     tcpConnectionParameters params;
 
@@ -73,11 +78,11 @@ static byte _OpenPassiveTcpConnection(byte* connection_id, uint port)
     params.flags = TCP_OPEN_FLAGS_PASSIVE;
 
     regs.Words.HL = (int)&params;
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_OPEN, &regs, REGS_MAIN, REGS_MAIN);
+    UnapiCall(&state.unapiCodeBlock, TCPIP_TCP_OPEN, &regs, REGS_MAIN, REGS_MAIN);
     if(regs.Bytes.A == 0)
     {
         data_buffer_length = 0;
-        *connection_id = regs.Bytes.B;
+        *tcpConnectionNumber = regs.Bytes.B;
     }
         
     return regs.Bytes.A;
@@ -88,11 +93,11 @@ byte OpenPassiveTcpConnection(uint port)
 {
     byte error;
 
-    error = _OpenPassiveTcpConnection(&connection_id, port);
+    error = _OpenPassiveTcpConnection(&state.tcpConnectionNumber, port);
     if(error == ERR_NO_FREE_CONN)
     {
         AbortAllTransientTcpConnections();
-        error = _OpenPassiveTcpConnection(&connection_id, port);
+        error = _OpenPassiveTcpConnection(&state.tcpConnectionNumber, port);
     }
 
     return error;
@@ -101,13 +106,13 @@ byte OpenPassiveTcpConnection(uint port)
 
 byte GetSimplifiedTcpConnectionState()
 {
-    regs.Bytes.B = connection_id;
+    regs.Bytes.B = state.tcpConnectionNumber;
     regs.Words.HL = 0;
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_STATE, &regs, REGS_MAIN, REGS_MAIN);
+    UnapiCall(&state.unapiCodeBlock, TCPIP_TCP_STATE, &regs, REGS_MAIN, REGS_MAIN);
 
     if(regs.Bytes.A != 0)
     {
-        connection_id = 0;
+        state.tcpConnectionNumber = 0;
         return TCP_STATE_CLOSED;
     }
     else if(regs.Bytes.B < TCP_STATE_ESTABLISHED)
@@ -123,12 +128,12 @@ byte GetSimplifiedTcpConnectionState()
 
 bool CloseTcpConnection()
 {
-    if(connection_id == 0)
+    if(state.tcpConnectionNumber == 0)
         return false;
 
-    regs.Bytes.B = connection_id;
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_CLOSE, &regs, REGS_MAIN, REGS_NONE);
-    connection_id = 0;
+    regs.Bytes.B = state.tcpConnectionNumber;
+    UnapiCall(&state.unapiCodeBlock, TCPIP_TCP_CLOSE, &regs, REGS_MAIN, REGS_NONE);
+    state.tcpConnectionNumber = 0;
     return true;
 }
 
@@ -138,10 +143,10 @@ bool EnsureIncomingTcpDataIsAvailable()
     if(data_buffer_length != 0)
         return true;
 
-    regs.Bytes.B = connection_id;
+    regs.Bytes.B = state.tcpConnectionNumber;
     regs.Words.DE = (int)data_buffer;
     regs.Words.HL = sizeof(data_buffer);
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_RCV, &regs, REGS_MAIN, REGS_MAIN);
+    UnapiCall(&state.unapiCodeBlock, TCPIP_TCP_RCV, &regs, REGS_MAIN, REGS_MAIN);
     if(regs.Bytes.A != 0)
         return false;
     
@@ -166,13 +171,13 @@ byte GetIncomingTcpByte()
 
 bool SendDataToTcpConnection(byte* data, int length)
 {
-    regs.Bytes.B = connection_id;
+    regs.Bytes.B = state.tcpConnectionNumber;
     regs.Words.DE = (int)data;
     regs.Words.HL = length;
     regs.Bytes.C = 0; //Not sure if using TCP_SEND_FLAGS_PUSH would be appropriate here
-    UnapiCall(&tcpip_unapi_code_block, TCPIP_TCP_SEND, &regs, REGS_MAIN, REGS_MAIN);
+    UnapiCall(&state.unapiCodeBlock, TCPIP_TCP_SEND, &regs, REGS_MAIN, REGS_MAIN);
     
-    //Any other error means the connection is in a wrong state and will be handled by the HTTP automaton
+    //Any other error means the connection is in a wrong config and will be handled by the HTTP automaton
     return regs.Bytes.A != ERR_BUFFER;
 }
 

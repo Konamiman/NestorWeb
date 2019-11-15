@@ -21,10 +21,12 @@ enum HttpAutomatonStates {
     HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1,
     HTTPA_SENDING_DIRECTORY_LISTING_HEADER_2,
     HTTPA_SENDING_DIRECTORY_LISTING_ENTRIES,
-    HTTPA_SENDING_DIRECTORY_LISTING_FOOTER
+    HTTPA_SENDING_DIRECTORY_LISTING_FOOTER,
+    HTTPA_SENDING_RESULT_AFTER_CGI
 };
 
 
-void InitializeHttpAutomaton(char* base_directory, char* http_error_buffer, byte* ip, uint port, byte verbose_mode, int inactivity_timeout_in_ticks, bool enable_directory_listing, bool enable_cgi);
+void InitializeHttpAutomaton();
+void ReinitializeHttpAutomaton(byte errorCodeFromCgi);
 void CleanupHttpAutomaton();
 void DoHttpServerAutomatonStep();

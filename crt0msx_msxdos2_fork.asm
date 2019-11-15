@@ -626,12 +626,12 @@ do_join:
     ld (#7),a
 
     ;Copy state data to a survivable location,
-    ;we'll recycle the area used by "main"
+    ;we'll recycle the area for the command line arguments
 
     push ix
     pop hl
     ld l,#TMP_STATE_DATA
-    ld de,#init
+    ld de,#0x80
     ld bc,#128
     ldir
 
@@ -641,10 +641,11 @@ do_join:
     ld l,TMP_SP(ix)
     ld h,TMP_SP+1(ix)
     ld sp,hl
+    ld (orig_stack),hl ;Needed to be able to re-fork
 
     ;Push arguments for proc_join, then execute it
 
-    ld de,#init
+    ld de,#0x80
     push de
     push bc
     inc sp
