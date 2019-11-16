@@ -13,7 +13,20 @@ extern byte buffer[64];
 extern const char* empty_str;
 extern char temp_directory[64];
 
+static char temp_in_filename[64+1];
+static char temp_out_filename[64+1];
+
 #define PrintUnlessSilent(s) { if(state.verbosityLevel > VERBOSE_MODE_SILENT) printf(s); }
+
+
+void InitializeCgiEngine()
+{
+    strcpy(temp_in_filename, temp_directory);
+    strcat(temp_in_filename, "_NHTTPIN.$");
+    strcpy(temp_out_filename, temp_directory);
+    strcat(temp_out_filename, "_NHTTPOUT.$");
+}
+
 
 void RunCgi()
 {

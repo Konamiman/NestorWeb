@@ -38,6 +38,7 @@ void HideFunctionKeys();
 void SetFunctionKeyContents(int key, char* contents);
 bool GetEnvironmentItem(const char* name, char* value);
 byte SetEnvironmentItem(const char* name, char* value);
+#define DeleteEnvironmentItem(name) SetEnvironmentItem(name, empty_str)
 void FindEnvironmentItem(uint index, char* name);
 char* GetPointerToLastItemOfPathname(const char* pathname);
 

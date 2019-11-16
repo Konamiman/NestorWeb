@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "version.h"
 #include "proc.h"
+#include "cgi.h"
 
 const char* empty_str = "";
 
@@ -33,6 +34,7 @@ const char* strHelp =
     "Files are sent as attachments if \"?a=1\" is added to the request.\r\n"
     "\r\n";
 
+const char* temp_directory_backup_env_item = "_NHTTP_TEMP";
 
 applicationState state;
 Z80_registers regs;
@@ -154,8 +156,16 @@ void Initialize()
     InitializeTcpIpUnapi();
     CHECK(TcpIpSupportsPassiveTcpConnections, "The TCP/IP UNAPI implementation doesn't support passive TCP connections");
 
-    if(state.cgiEnabled && !GetTempDirectory())
-        TerminateWithErrorMessage("Invalid temporary directory (in NHTTP_TEMP or TEMP environment item)");
+    if(state.cgiEnabled)
+    {
+        if(!GetTempDirectory())
+            TerminateWithErrorMessage("Invalid temporary directory (in NHTTP_TEMP or TEMP environment item)");
+        
+        if(strlen(temp_directory) > 64-11)
+            TerminateWithErrorMessage("Invalid temporary directory (in NHTTP_TEMP or TEMP environment item): too long");
+
+        InitializeCgiEngine();
+    }        
 
     DisableDiskErrorPrompt();
     AbortAllTransientTcpConnections();
@@ -208,6 +218,8 @@ void Cleanup()
 
     HideFunctionKeys();
     memcpy(F_KEY_CONTENTS_POINTER(1), function_keys_backup, sizeof(function_keys_backup));
+
+    DeleteEnvironmentItem(temp_directory_backup_env_item);
 }
 
 
@@ -216,6 +228,11 @@ byte proc_join(byte error_code_from_subprocess, void* state_data)
     memcpy(&state, state_data, sizeof(applicationState));
     ReinitializeTcpIpUnapi();
     ReinitializeHttpAutomaton(error_code_from_subprocess);
+    if(state.cgiEnabled)
+    {
+        GetEnvironmentItem(temp_directory_backup_env_item, temp_directory);
+        ReinitializeCgiEngine();
+    }
     return ServerMainLoop();
 }
 
@@ -240,5 +257,10 @@ bool GetTempDirectory()
         }
     }
 
-    return NormalizeDirectory(buffer, temp_directory) == 0;
+    error = NormalizeDirectory(buffer, temp_directory);
+    if(error)
+        return false;
+
+    SetEnvironmentItem(temp_directory_backup_env_item, temp_directory);
+    return true;
 }

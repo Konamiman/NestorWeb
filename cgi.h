@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+void InitializeCgiEngine();
+#define ReinitializeCgiEngine() InitializeCgiEngine()
 void RunCgi();
 void SendResultAfterCgi(byte error_code_from_cgi);
 
