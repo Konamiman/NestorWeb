@@ -227,7 +227,7 @@ void FindEnvironmentItem(uint index, char* name)
 }
 
 
-char* GetPointerToLastItemOfPathname(const char* pathname, byte* parse_flags, byte* drive, char** pointer_to_last_item)
+char* GetPointerToLastItemOfPathname(const char* pathname)
 {
     regs.Bytes.B = 0;
     regs.Words.DE = (int)pathname;
@@ -235,8 +235,5 @@ char* GetPointerToLastItemOfPathname(const char* pathname, byte* parse_flags, by
     if(regs.Bytes.A != 0)
         return null;
     
-    if(parse_flags) *parse_flags = regs.Bytes.B;
-    if(drive) *drive = regs.Bytes.C;
-    if(pointer_to_last_item) *pointer_to_last_item = (char*)regs.Words.DE;
     return (char*)regs.Words.HL;
 }

@@ -85,7 +85,7 @@ static const char* dir_list_entry =
     "<td>%s</td>"
     "</tr>";
 
-const char* empty_str = "";
+extern const char* empty_str;
 
 static void InitializeDataBuffer();
 static void OpenServerConnection();

@@ -9,6 +9,8 @@
 #include "version.h"
 #include "proc.h"
 
+const char* empty_str = "";
+
 const char* strTitle = 
     "NestorHTTP " VERSION " - the HTTP server for MSX\r\n"
     "(c) 2020 by Konamiman\r\n"
@@ -227,59 +229,16 @@ bool GetTempDirectory()
     byte drive;
     char* pointer_to_terminator;
 
-    if(!GetEnvironmentItem("NHTTP_TEMP", temp_directory))
+    if(!GetEnvironmentItem("NHTTP_TEMP", buffer))
     {
-        if(!GetEnvironmentItem("TEMP", temp_directory))
+        if(!GetEnvironmentItem("TEMP", buffer))
         {
-            GetEnvironmentItem("PROGRAM", temp_directory);
-            pointer_to_last_item = GetPointerToLastItemOfPathname(temp_directory, null, null, null);
+            GetEnvironmentItem("PROGRAM", buffer);
+            pointer_to_last_item = GetPointerToLastItemOfPathname(temp_directory);
             *pointer_to_last_item = '\0';
             return true;
         }
     }
 
-    pointer_to_last_item = GetPointerToLastItemOfPathname(temp_directory, &parse_flags, &drive, &pointer_to_terminator);
-    if(!pointer_to_last_item)
-        return false;
-
-    if(parse_flags & (PARSE_FLAGS_IS_AMBIGUOUS | PARSE_FLAGS_IS_DOT))
-    {
-        return false;
-    }
-    
-    len = (byte)(pointer_to_terminator - temp_directory);
-    if((parse_flags & PARSE_FLAGS_HAS_DRIVE) && len < 4)
-    {
-        //Root directory of a drive, validate by trying to search something
-        error = SearchFile(temp_directory, &file_fib, true);
-        if(error != 0 && error != ERR_NOFIL)
-            return false;
-        
-        sprintf(temp_directory, "%c:\\", drive + 'A' - 1);
-        return true;
-    }
-
-    //Must exist and be a directory
-    error = SearchFile(temp_directory, &file_fib, true);
-    if(error || (file_fib.attributes & FILE_ATTR_DIRECTORY) == 0)
-        return false;
-
-    //Normalize to drive:\full_path
-    sprintf(temp_directory, "%c:\\", file_fib.logicalDrive + 'A' - 1);
-    regs.Words.DE = (int)(&temp_directory[3]);
-    DosCall(F_WPATH, &regs, REGS_MAIN, REGS_NONE);
-
-    pointer_to_last_item = GetPointerToLastItemOfPathname(temp_directory, null, null, pointer_to_terminator);
-    if(parse_flags & PARSE_FLAGS_HAS_FILENAME)
-    {
-        pointer_to_terminator[0] = '\\';
-        pointer_to_terminator[1] = '\0';
-    }
-    else
-    {
-        //If value already finished with "\", the result of _WPATH will end with "????????.???"
-        *pointer_to_last_item = '\0';
-    }
-
-    return true;
+    return NormalizeDirectory(buffer, temp_directory) == 0;
 }
