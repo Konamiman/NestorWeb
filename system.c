@@ -106,12 +106,13 @@ byte SearchNextFile(fileInfoBlock* fib)
 }
 
 
-byte OpenFile(void* path_or_fib, byte* file_handle)
+byte OpenOrCreateFile(byte function_call, void* path_or_fib, byte* file_handle, byte flags)
 {
     regs.Words.DE = (int)path_or_fib;
-    regs.Bytes.A = 0;
-    DosCall(F_OPEN, &regs, REGS_MAIN, REGS_MAIN);
-    if(regs.Bytes.A == 0)
+    regs.Bytes.A = flags;
+    regs.Bytes.B = 0;
+    DosCall(function_call, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A == 0 && file_handle != null)
         *file_handle = regs.Bytes.B;
     
     return regs.Bytes.A;
@@ -132,7 +133,7 @@ byte ReadFromFile(byte file_handle, byte* destination, int* length)
 void CloseFile(byte file_handle)
 {
     regs.Bytes.B = file_handle;
-    DosCall(F_READ, &regs, REGS_MAIN, REGS_NONE);
+    DosCall(F_CLOSE, &regs, REGS_MAIN, REGS_NONE);
 }
 
 
@@ -161,8 +162,14 @@ DSKERR_CODE:
 ABORT_CODE:
     ld c,a
     cp #ERR_ABORT
+    jr z,ABORT_CODE2
+    cp #ERR_INERR
+    jr z,ABORT_CODE2
+    cp #ERR_OUTERR
+    jr z,ABORT_CODE2
     ld a,c
-    ret nz ;Not a disk error abort -> the program is willingfully terminating
+    ret     ;Not a disk error abort -> the program is willingfully terminating
+ABORT_CODE2:
 
     ;This causes execution to return to the caller of the DOS function call,
     ;instead of continuing to the termination of the program
@@ -236,4 +243,22 @@ char* GetPointerToLastItemOfPathname(const char* pathname)
         return null;
     
     return (char*)regs.Words.HL;
+}
+
+
+byte DuplicateFileHandle(byte fileHandle, byte* duplicatedFileHandle)
+{
+    regs.Bytes.B = fileHandle;
+    DosCall(F_DUP, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A == 0 && duplicatedFileHandle)
+        *duplicatedFileHandle = regs.Bytes.B;
+    return regs.Bytes.A;
+}
+
+
+byte DeleteFile(char* path)
+{
+    regs.Words.DE = (int)path;
+    DosCall(F_DELETE, &regs, REGS_MAIN, REGS_AF);
+    return regs.Bytes.A;
 }

@@ -42,6 +42,7 @@ char http_error_buffer[80];
 char temp_directory[64];
 fileInfoBlock file_fib;
 byte buffer[64];
+byte buffer2[64];
 
 static bool function_keys_were_visible;
 static char function_keys_backup[5 * F_KEY_CONTENTS_LENGTH];
@@ -215,11 +216,11 @@ void TerminateWithErrorMessage(char* message)
 void Cleanup()
 {
     CleanupHttpAutomaton();
+    CleanupCgiEngine();
+    DeleteEnvironmentItem(temp_directory_backup_env_item);
 
     HideFunctionKeys();
     memcpy(F_KEY_CONTENTS_POINTER(1), function_keys_backup, sizeof(function_keys_backup));
-
-    DeleteEnvironmentItem(temp_directory_backup_env_item);
 }
 
 
@@ -227,12 +228,9 @@ byte proc_join(byte error_code_from_subprocess, void* state_data)
 {
     memcpy(&state, state_data, sizeof(applicationState));
     ReinitializeTcpIpUnapi();
-    ReinitializeHttpAutomaton(error_code_from_subprocess);
-    if(state.cgiEnabled)
-    {
-        GetEnvironmentItem(temp_directory_backup_env_item, temp_directory);
-        ReinitializeCgiEngine();
-    }
+    ReinitializeHttpAutomaton();
+    GetEnvironmentItem(temp_directory_backup_env_item, temp_directory);
+    ReinitializeCgiEngine(error_code_from_subprocess);
     return ServerMainLoop();
 }
 
@@ -241,10 +239,6 @@ bool GetTempDirectory()
 {
     char* pointer_to_last_item;
     byte error;
-    byte parse_flags;
-    byte len;
-    byte drive;
-    char* pointer_to_terminator;
 
     if(!GetEnvironmentItem("NHTTP_TEMP", buffer))
     {
@@ -253,6 +247,7 @@ bool GetTempDirectory()
             GetEnvironmentItem("PROGRAM", buffer);
             pointer_to_last_item = GetPointerToLastItemOfPathname(temp_directory);
             *pointer_to_last_item = '\0';
+            SetEnvironmentItem(temp_directory_backup_env_item, temp_directory);
             return true;
         }
     }

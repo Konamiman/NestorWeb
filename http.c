@@ -8,6 +8,7 @@
 #include "msxdos.h"
 #include "proc.h"
 #include "cgi.h"
+#include "buffers.h"
 #include <string.h>
 
 #define MAX_CACHE_SECS_FOR_DIRECTORY_LISTING "3600"
@@ -16,35 +17,38 @@ extern applicationState state;
 extern char http_error_buffer[80];
 extern fileInfoBlock file_fib;
 extern byte buffer[64];
+extern byte buffer2[64];
 
-static byte automaton_state;
-static byte data_buffer[256+1];
+byte* output_data_buffer;
+byte* output_data_pointer;
+byte file_handle;
+byte automaton_state;
+int output_data_length;
+byte data_buffer[256+1];
+
 static byte* data_buffer_pointer;
 static int data_buffer_length;
 static bool skipping_data;
 static int last_system_timer_value;
 static int ticks_without_data;
-static byte output_data_buffer[512];
-static int output_data_length;
 static char filename_buffer[MAX_FILE_PATH_LEN*2];
 static bool base_directory_is_root_of_drive;
-static byte file_handle;
 static fileInfoBlock dir_list_fib;
 static bool send_as_attachment;
 static bool has_if_modified_since;
 static dateTime fib_date;
 static dateTime if_modified_since_date;
 static byte base_directory_length;
-static byte buffer2[32];
 static byte requested_resource[MAX_FILE_PATH_LEN+1];
 static int requested_resource_length;
 static bool must_run_cgi;
+static byte error_code_from_cgi;
 
 static char num_buffer[11];
 static char content_length_buffer[32];
 
 static const char* default_document = "\\INDEX.HTM";
-static const char* connection_lost_str = "Connection lost\r\n";
+const char* connection_lost_str = "Connection lost\r\n";
 static const char* connection_closed_by_client_str = "Connection closed by client\r\n";
 
 //Note that this one has the chunked transfer size hardcoded at the beginning.
@@ -99,9 +103,8 @@ static void ContinueReadingHeaders();
 static void ProcessHeader();
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
 static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
-static char* ConvertRequestToFilename(char** query_string_start, char** resource_start);
+static char* ConvertRequestToFilename(char** query_string_start, char** resource_start, bool is_local_redirect);
 static void SendNotFoundError();
-static void ProcessFileOrDirectoryRequest();
 static void StartSendingFile();
 static bool CheckIfModifiedSince();
 static void SendLastModified();
@@ -136,6 +139,7 @@ void InitializeHttpAutomatonData()
     base_directory_is_root_of_drive = base_directory_length < 3;
     http_error_buffer[0] = '\0';
     file_handle = 0;
+    output_data_buffer = OUTPUT_DATA_BUFFER_START;
     ResetInactivityCounter();
 }
 
@@ -147,15 +151,9 @@ void InitializeHttpAutomaton()
 }
 
 
-void ReinitializeHttpAutomaton(byte errorCodeFromCgi)
+void ReinitializeHttpAutomaton()
 {
     InitializeHttpAutomatonData();
-    
-    if(state.verbosityLevel > VERBOSE_MODE_SILENT)
-        printf("CGI script returned error code %i\r\n", errorCodeFromCgi);
-
-    automaton_state = HTTPA_SENDING_RESULT_AFTER_CGI;
-    SendResultAfterCgi(errorCodeFromCgi);
 }
 
 
@@ -201,6 +199,9 @@ void DoHttpServerAutomatonStep()
             break;
         case HTTPA_SENDING_DIRECTORY_LISTING_FOOTER:
             FinishSendingDirectory();
+            break;
+        case HTTPA_SENDING_CGI_RESULT_HEADERS:
+            ContinueSendingCgiResultHeaders();
             break;
     }
 }
@@ -300,23 +301,15 @@ static void ContinueReadingRequest()
         InitializeDataBuffer();
         automaton_state = HTTPA_READING_HEADERS;
     }
-    else
-    {
-        CloseConnectionToClient();
-    }
 }
 
 
 static bool ProcessRequestLine()
 {
-    char* converted_filename;
-    char* query_string;
-    char* resource_name_start;
-
     if(state.verbosityLevel > VERBOSE_MODE_SILENT)
         printf("Request: %s\r\n", data_buffer);
 
-    if(strlen(data_buffer) == sizeof(data_buffer)-1)
+    if(strlen(data_buffer) == 256)
     {
         PrintUnlessSilent("ERROR: Request line too long, connection refused\r\n");
         return false;
@@ -328,21 +321,37 @@ static bool ProcessRequestLine()
         return false;
     }
 
-    converted_filename = ConvertRequestToFilename(&query_string, &resource_name_start);
+    return ProcessRequestedResource(false);
+}
+
+
+bool ProcessRequestedResource(bool is_local_redirect)
+{
+    char* converted_filename;
+    char* query_string;
+    char* resource_name_start;
+    bool is_cgi_file;
+    bool can_run_cgi;
+
+    converted_filename = ConvertRequestToFilename(&query_string, &resource_name_start, is_local_redirect);
     send_as_attachment = query_string && strncmpi(query_string, "a=1", 3);
 
     if(converted_filename)
     {
-        must_run_cgi = state.cgiEnabled && strncmpi(resource_name_start, "CGI-BIN", 7);
-        strcpy(filename_buffer, state.baseDirectory);
-        strcat(filename_buffer, converted_filename);
-        return true;
+        is_cgi_file = strncmpi(resource_name_start, "CGI-BIN", 7);
+        can_run_cgi = !is_local_redirect && state.cgiEnabled;
+        if(!(is_cgi_file && !can_run_cgi))
+        {
+            must_run_cgi = can_run_cgi && is_cgi_file;
+            strcpy(filename_buffer, state.baseDirectory);
+            strcat(filename_buffer, converted_filename);
+            return true;
+        }
     }
-    else
-    {
-        SendNotFoundError();
-        return false;
-    }
+
+    SendNotFoundError();
+    CloseConnectionToClient();
+    return false;
 }
 
 
@@ -365,7 +374,7 @@ static bool ContinueReadingLine()
                 *data_buffer_pointer++ = datum;
                 data_buffer_length++;
 
-                if(data_buffer_length >= sizeof(data_buffer)-1)
+                if(data_buffer_length >= 256)
                 {
                     skipping_data = true;
                     PrintUnlessSilent("* WARNING: Line too long, truncating\r\n");
@@ -446,13 +455,19 @@ static void ProcessHeader()
 }
 
 
-void SendLineToClient(char* line)
+bool SendLineToClient(char* line)
 {
-    sprintf(data_buffer, "%s\r\n", line);
-    if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
-        printf("--> %s", data_buffer);
+    sprintf(TCP_INPUT_DATA_BUFFER_START, "%s\r\n", line);
+    return SendCrlfTerminatedLineToClient(TCP_INPUT_DATA_BUFFER_START);
+}
 
-    SendStringToTcpConnection(data_buffer);
+
+bool SendCrlfTerminatedLineToClient(char* line)
+{
+    if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
+        printf("--> %s", line);
+
+    return SendStringToTcpConnection(line);
 }
 
 
@@ -461,8 +476,8 @@ void SendResponseStart(int statusCode, char* statusMessage)
     if(state.verbosityLevel > VERBOSE_MODE_SILENT)
         printf("Response: %i %s\r\n", statusCode, statusMessage);
 
-    sprintf(buffer, "HTTP/1.1 %i %s", statusCode, statusMessage);
-    SendLineToClient(buffer);
+    sprintf(TCP_INPUT_DATA_BUFFER_START, "HTTP/1.1 %i %s\r\n", statusCode, statusMessage);
+    SendCrlfTerminatedLineToClient(TCP_INPUT_DATA_BUFFER_START);
     SendLineToClient("Connection: close");
     SendLineToClient("Server: NestorHTTP/" VERSION " (MSX-DOS)");
 }
@@ -524,7 +539,7 @@ static void SendErrorResponseToClient(int statusCode, char* statusMessage, char*
 }
 
 
-static char* ConvertRequestToFilename(char** query_string_start, char** resource_start)
+static char* ConvertRequestToFilename(char** query_string_start, char** resource_start, bool is_local_redirect)
 {
     char* pointer;
     char* start_pointer;
@@ -535,11 +550,18 @@ static char* ConvertRequestToFilename(char** query_string_start, char** resource
 
     pointer = data_buffer;
     *query_string_start = null;
+    
+    if(is_local_redirect)
+    {
+        pointer++;
+    }
+    else
+    {
+        while(*pointer != ' ') pointer++;
+        while(*pointer == ' ') pointer++;
+        if(*pointer == '/') pointer++;
+    }
 
-    //Skip the method and the initial "/"
-    while(*pointer != ' ') pointer++;
-    while(*pointer == ' ') pointer++;
-    if(*pointer == '/') pointer++;
     *resource_start = pointer;
 
     start_pointer = pointer;
@@ -601,7 +623,7 @@ void SendInternalError()
 }
 
 
-static void ProcessFileOrDirectoryRequest()
+void ProcessFileOrDirectoryRequest()
 {
     byte error;
     bool is_directory;
@@ -672,7 +694,7 @@ static void StartSendingFile()
     if(CheckIfModifiedSince())
         return;
 
-    error = OpenFile(&file_fib, &file_handle);
+    error = OpenFile(&file_fib, &file_handle, FILE_OPEN_NO_WRITE);
     if(error)
     {
         if(state.verbosityLevel > VERBOSE_MODE_SILENT)
@@ -744,6 +766,7 @@ static void SendLastModified()
 static void ContinueSendingFile()
 {
     byte error;
+    int size_of_data_chunk_to_send;
 
     while(true) //Continue while there's more data to send AND the TCP connection has room for more output data
     {
@@ -756,7 +779,8 @@ static void ContinueSendingFile()
 
         if(output_data_length == 0)
         {
-            output_data_length = sizeof(output_data_buffer);
+            output_data_length = OUTPUT_DATA_BUFFER_LENGTH;
+            output_data_pointer = output_data_buffer;
             error = ReadFromFile(file_handle, output_data_buffer, &output_data_length);
             if(error != 0)
             {
@@ -768,8 +792,15 @@ static void ContinueSendingFile()
             }
         }
 
-        if(SendDataToTcpConnection(output_data_buffer, output_data_length))
-            output_data_length = 0;
+        size_of_data_chunk_to_send = output_data_length;
+        if(size_of_data_chunk_to_send > TCP_UNAPI_OUTPUT_BUFFER_SIZE)
+            size_of_data_chunk_to_send = TCP_UNAPI_OUTPUT_BUFFER_SIZE;
+
+        if(SendDataToTcpConnection(output_data_pointer, size_of_data_chunk_to_send))
+        {
+            output_data_pointer += size_of_data_chunk_to_send;
+            output_data_length -= size_of_data_chunk_to_send;
+        }
         else
             return;
     }
@@ -785,11 +816,11 @@ static void StartSendingDirectory()
     if(requested_resource_length > 0 && requested_resource[requested_resource_length-1] != '/')
     {
         SendResponseStart(308, "Moved Permanently");
-        sprintf(output_data_buffer, "Location: http://%i.%i.%i.%i:%u/%s/",
+        sprintf(buffer, "Location: http://%i.%i.%i.%i:%u/%s/",
             state.localIp[0], state.localIp[1], state.localIp[2], state.localIp[3],
             state.tcpPort,
             requested_resource);
-        SendLineToClient(output_data_buffer);
+        SendLineToClient(buffer);
         SendLineToClient(empty_str);
         CloseConnectionToClient();
     }

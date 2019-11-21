@@ -2,6 +2,7 @@
 #include "asm.h"
 #include "tcpip.h"
 #include "stdio.h"
+#include "buffers.h"
 #include <string.h>
 
 
@@ -144,13 +145,13 @@ bool EnsureIncomingTcpDataIsAvailable()
         return true;
 
     regs.Bytes.B = state.tcpConnectionNumber;
-    regs.Words.DE = (int)data_buffer;
-    regs.Words.HL = sizeof(data_buffer);
+    regs.Words.DE = (int)TCP_INPUT_DATA_BUFFER_START;
+    regs.Words.HL = TCP_INPUT_DATA_BUFFER_SIZE;
     UnapiCall(&state.unapiCodeBlock, TCPIP_TCP_RCV, &regs, REGS_MAIN, REGS_MAIN);
     if(regs.Bytes.A != 0)
         return false;
     
-    data_buffer_pointer = data_buffer;
+    data_buffer_pointer = TCP_INPUT_DATA_BUFFER_START;
     data_buffer_length = regs.Words.BC;
 
     return data_buffer_length > 0;

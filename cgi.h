@@ -4,8 +4,12 @@
 #include "types.h"
 
 void InitializeCgiEngine();
-#define ReinitializeCgiEngine() InitializeCgiEngine()
+void ReinitializeCgiEngine(byte errorCodeFromCgi);
 void RunCgi();
-void SendResultAfterCgi(byte error_code_from_cgi);
+void SendResultAfterCgi();
+byte OpenCgiOutFileForRead(byte* file_handle);
+void CleanupCgiEngine();
+void StartSendingCgiResultHeaders();
+void ContinueSendingCgiResultHeaders();
 
 #endif

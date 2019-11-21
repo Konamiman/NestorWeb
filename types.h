@@ -21,6 +21,8 @@ typedef struct {
     bool cgiEnabled;
     byte localIp[4];
     byte tcpConnectionNumber;
+    byte stdinFileHandleCopy;
+    byte stdoutFileHandleCopy;
 } applicationState;
 
 

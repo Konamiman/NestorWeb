@@ -28,7 +28,9 @@ byte NormalizeDirectory(char* directoryPath, char* normalizedDirectoryPath);
 bool KeyIsPressed();
 byte SearchFile(void* fileNameOrFib, fileInfoBlock* fib, bool include_dirs);
 byte SearchNextFile(fileInfoBlock* fib);
-byte OpenFile(void* path_or_fib, byte* file_handle);
+byte OpenOrCreateFile(byte function_call, void* path_or_fib, byte* file_handle, byte flags);
+#define OpenFile(path_or_fib, file_handle, flags) OpenOrCreateFile(F_OPEN, path_or_fib, file_handle, flags)
+#define CreateFile(path_or_fib, file_handle, flags) OpenOrCreateFile(F_CREATE, path_or_fib, file_handle, flags)
 byte ReadFromFile(byte file_handle, byte* destination, int* length);
 void CloseFile(byte file_handle);
 void DisableDiskErrorPrompt();
@@ -41,5 +43,7 @@ byte SetEnvironmentItem(const char* name, char* value);
 #define DeleteEnvironmentItem(name) SetEnvironmentItem(name, empty_str)
 void FindEnvironmentItem(uint index, char* name);
 char* GetPointerToLastItemOfPathname(const char* pathname);
+byte DuplicateFileHandle(byte fileHandle, byte* duplicatedFileHandle);
+byte DeleteFile(char* path);
 
 #endif
