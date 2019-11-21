@@ -262,3 +262,12 @@ byte DeleteFile(char* path)
     DosCall(F_DELETE, &regs, REGS_MAIN, REGS_AF);
     return regs.Bytes.A;
 }
+
+
+byte ParseFilename(const char* fileName, char* expandedFilename)
+{
+    regs.Words.DE = (int)fileName;
+    regs.Words.HL = (int)expandedFilename;
+    DosCall(F_PFILE, &regs, REGS_MAIN, REGS_AF);
+    return regs.Bytes.A;
+}

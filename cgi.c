@@ -95,6 +95,14 @@ void RunCgi()
     byte file_handle;
     byte file_handle2;
 
+    ParseFilename(file_fib.filename, data_buffer);
+    if(!strncmpi(&data_buffer[8], "CGI", 3) && !strncmpi(&data_buffer[8], "COM", 3))
+    {
+        SendNotFoundError();
+        CloseConnectionToClient();
+        return;
+    }
+
     PrintUnlessSilent("Running CGI script\r\n");
 
     error = CreateFile(temp_out_filename, &file_handle, FILE_OPEN_NO_READ | FILE_OPEN_INHERITABLE); //File handle will be STDOUT

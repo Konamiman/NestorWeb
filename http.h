@@ -35,6 +35,7 @@ void CleanupHttpAutomaton();
 
 void DoHttpServerAutomatonStep();
 void SendInternalError();
+void SendNotFoundError();
 void ProcessFileOrDirectoryRequest();
 void CloseConnectionToClient();
 void SendResponseStart(int statusCode, char* statusMessage);

@@ -45,5 +45,6 @@ void FindEnvironmentItem(uint index, char* name);
 char* GetPointerToLastItemOfPathname(const char* pathname);
 byte DuplicateFileHandle(byte fileHandle, byte* duplicatedFileHandle);
 byte DeleteFile(char* path);
+byte ParseFilename(const char* fileName, char* expandedFilename);
 
 #endif

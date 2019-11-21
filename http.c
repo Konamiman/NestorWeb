@@ -104,7 +104,6 @@ static void ProcessHeader();
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
 static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
 static char* ConvertRequestToFilename(char** query_string_start, char** resource_start, bool is_local_redirect);
-static void SendNotFoundError();
 static void StartSendingFile();
 static bool CheckIfModifiedSince();
 static void SendLastModified();
@@ -611,7 +610,7 @@ static char* ConvertRequestToFilename(char** query_string_start, char** resource
 }
 
 
-static void SendNotFoundError()
+void SendNotFoundError()
 {
     SendErrorResponseToClient(404, "Not Found", "The requested resource was not found in this server");
 }
