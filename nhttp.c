@@ -157,6 +157,10 @@ void Initialize()
     InitializeTcpIpUnapi();
     CHECK(TcpIpSupportsPassiveTcpConnections, "The TCP/IP UNAPI implementation doesn't support passive TCP connections");
 
+    GetLocalIpAddress(state.localIp);
+    if(*(long*)state.localIp == 0)
+        TerminateWithErrorMessage("Local IP address is not configured");
+
     if(state.cgiEnabled)
     {
         if(!GetTempDirectory())
@@ -170,10 +174,6 @@ void Initialize()
 
     DisableDiskErrorPrompt();
     AbortAllTransientTcpConnections();
-
-    GetLocalIpAddress(state.localIp);
-    if(*(long*)state.localIp == 0)
-        TerminateWithErrorMessage("Local IP address is not configured");
 
     printf("Base directory: %s\r\n", state.baseDirectory);
     printf("Directory listing is %s\r\n", state.directoryListingEnabled ? "ON" : "OFF");

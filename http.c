@@ -25,13 +25,13 @@ byte file_handle;
 byte automaton_state;
 int output_data_length;
 byte data_buffer[256+1];
+char filename_buffer[MAX_FILE_PATH_LEN*2];
 
 static byte* data_buffer_pointer;
 static int data_buffer_length;
 static bool skipping_data;
 static int last_system_timer_value;
 static int ticks_without_data;
-static char filename_buffer[MAX_FILE_PATH_LEN*2];
 static bool base_directory_is_root_of_drive;
 static fileInfoBlock dir_list_fib;
 static bool send_as_attachment;

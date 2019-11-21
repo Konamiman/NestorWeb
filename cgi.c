@@ -8,6 +8,7 @@
 #include "buffers.h"
 #include "utils.h"
 #include "stdlib.h"
+#include "version.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -24,6 +25,7 @@ extern const char* connection_lost_str;
 extern int output_data_length;
 extern byte* output_data_pointer;
 extern byte data_buffer[256+1];
+extern char filename_buffer[MAX_FILE_PATH_LEN*2];
 
 static byte error_code_from_cgi;
 static char* cgi_header_pointer;
@@ -47,6 +49,11 @@ static bool ProcessFirstHeaderOfCgiResult();
 static const char* ok_str = "Ok";
 static const char* found_str = "Found";
 
+static const char* env_gateway_interface = "GATEWAY_INTERFACE";
+static const char* env_server_name = "SERVER_NAME";
+static const char* env_server_port = "SERVER_PORT";
+static const char* env_server_software = "SERVER_SOFTWARE";
+
 
 static void CreateTempFilePaths()
 {
@@ -57,9 +64,24 @@ static void CreateTempFilePaths()
 }
 
 
+static void InitializeFixedEnvItems()
+{
+    SetEnvironmentItem(env_gateway_interface, "CGI/1.1");
+    
+    sprintf(data_buffer, "%i.%i.%i.%i", state.localIp[0], state.localIp[1], state.localIp[2], state.localIp[2]);
+    SetEnvironmentItem(env_server_name, data_buffer);
+
+    sprintf(data_buffer, "%i", state.tcpPort);
+    SetEnvironmentItem(env_server_port, data_buffer);
+
+    SetEnvironmentItem(env_server_software, "NestorHTTP/" VERSION);
+}
+
+
 void InitializeCgiEngine()
 {
     CreateTempFilePaths();
+    InitializeFixedEnvItems();
     state.stdoutFileHandleCopy = 0xFF;
 }
 
@@ -131,7 +153,10 @@ void RunCgi()
     DuplicateFileHandle(file_handle, null);
     CloseFile(file_handle);
 
-    error = proc_fork(&file_fib, null, &state);
+    //Unfortunately we can't use file_fib here, since the messing with STDOUT above
+    //spoils the contents of the buffer returned by _WPATH, and thus the CGI program
+    //would receive an incorrect value for the PROGRAM environment item.
+    error = proc_fork(filename_buffer, null, &state);
 
     //If we get here there was an error while attempting to fork
 
@@ -153,6 +178,11 @@ byte OpenCgiOutFileForRead(byte* file_handle)
 void CleanupCgiEngine()
 {
     DeleteFile(temp_out_filename);
+
+    DeleteEnvironmentItem(env_gateway_interface);
+    DeleteEnvironmentItem(env_server_name);
+    DeleteEnvironmentItem(env_server_port);
+    DeleteEnvironmentItem(env_server_software);
 }
 
 
