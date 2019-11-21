@@ -9,7 +9,7 @@ void RunCgi();
 void SendResultAfterCgi();
 byte OpenCgiOutFileForRead(byte* file_handle);
 void CleanupCgiEngine();
-void StartSendingCgiResultHeaders();
+void StartSendingCgiResult();
 void ContinueSendingCgiResultHeaders();
 
 #endif

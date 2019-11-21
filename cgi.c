@@ -28,8 +28,6 @@ extern byte data_buffer[256+1];
 static byte error_code_from_cgi;
 static char* cgi_header_pointer;
 static int cgi_header_length;
-static byte* cgi_output_pointer;
-static int cgi_output_length;
 static int status_code;
 static char* status_message;
 static bool must_send_cgi_out_content;
@@ -43,6 +41,7 @@ static char cgi_contents_filename[128];
 
 
 static bool GetOutputHeaderLine();
+static bool ProcessFirstHeaderOfCgiResult();
 
 
 static const char* ok_str = "Ok";
@@ -86,7 +85,7 @@ void ReinitializeCgiEngine(byte errorCodeFromCgi)
         printf("CGI script returned error code %i\r\n", errorCodeFromCgi);
 
     error_code_from_cgi = errorCodeFromCgi;
-    StartSendingCgiResultHeaders();
+    StartSendingCgiResult();
 }
 
 
@@ -149,11 +148,10 @@ void CleanupCgiEngine()
 }
 
 
-void StartSendingCgiResultHeaders()
+void StartSendingCgiResult()
 {
     byte error;
     bool line_ok;
-    char* tmp_pointer;
 
     if(error_code_from_cgi != 0)
     {
@@ -175,9 +173,9 @@ void StartSendingCgiResultHeaders()
     }
 
 
-    cgi_output_length = OUTPUT_DATA_BUFFER_LENGTH;
-    cgi_output_pointer = OUTPUT_DATA_BUFFER_START;
-    error = ReadFromFile(file_handle, OUTPUT_DATA_BUFFER_START, &cgi_output_length);
+    output_data_length = OUTPUT_DATA_BUFFER_LENGTH;
+    output_data_pointer = OUTPUT_DATA_BUFFER_START;
+    error = ReadFromFile(file_handle, OUTPUT_DATA_BUFFER_START, &output_data_length);
     if(error == ERR_EOF)
     {
         SendResponseStart(204, "No Content");
@@ -199,12 +197,9 @@ void StartSendingCgiResultHeaders()
     must_send_cgi_out_content = true;
     must_send_cgi_contents_file = false;
 
-    if(strncmpi(cgi_output_pointer, "HTTP/", 5))
+    if(strncmpi(output_data_pointer, "HTTP/", 5))
     {
         PrintUnlessSilent("Sending response as NPH\r\n");
-
-        output_data_length = cgi_output_length;
-        output_data_pointer = cgi_output_pointer;
 
         automaton_state = HTTPA_SENDING_FILE_CONTENTS;
         return;
@@ -216,6 +211,21 @@ void StartSendingCgiResultHeaders()
     status_code = 200;
     status_message = ok_str;
 
+    if(!ProcessFirstHeaderOfCgiResult())
+        return;
+
+    SendResponseStart(status_code, status_message);
+    automaton_state = HTTPA_SENDING_CGI_RESULT_HEADERS;
+    
+    ContinueSendingCgiResultHeaders();
+}
+
+
+static bool ProcessFirstHeaderOfCgiResult()
+{
+    char* tmp_pointer;
+    byte error;
+
     if(strncmpi(cgi_header_pointer, "Status:", 7))
     {
         cgi_header_pointer += 6;
@@ -226,14 +236,14 @@ void StartSendingCgiResultHeaders()
             PrintUnlessSilent("*** Malformed data received from CGI script: invalid 'Status' header\r\n");
             SendInternalError();
             CloseConnectionToClient();
-            return;
+            return false;
         }
         while(*++cgi_header_pointer >= '0' && *cgi_header_pointer <= '9');
         while(*++cgi_header_pointer == ' ');
         status_message = cgi_header_pointer;
 
         if(!GetOutputHeaderLine())
-            return;
+            return false;
     }
     else if(strncmpi(cgi_header_pointer, "Location:", 9))
     {
@@ -256,7 +266,7 @@ void StartSendingCgiResultHeaders()
                 ProcessFileOrDirectoryRequest();
             }
 
-            return;
+            return false;
         }
 
         //Client redirect
@@ -270,6 +280,10 @@ void StartSendingCgiResultHeaders()
     }
     else if(strncmpi(cgi_header_pointer, "X-CGI-Location:", 15))
     {
+        //Value is expected to be a file path relative to CGI file location,
+        //with MSX-DOS separators ('\'), without initial '\'.
+        //Example: X-CGI-Location: data\myscript.dat
+
         tmp_pointer = cgi_header_pointer+15;
         while(*tmp_pointer == ' ') tmp_pointer++;
 
@@ -286,19 +300,16 @@ void StartSendingCgiResultHeaders()
             PrintUnlessSilent("*** Error: local file contents not found\r\n");
             SendInternalError();
             CloseConnectionToClient();
-            return;
+            return false;
         }
 
         if(!GetOutputHeaderLine())
-            return;
+            return false;
 
         must_send_cgi_contents_file = true;
     }
 
-    SendResponseStart(status_code, status_message);
-    automaton_state = HTTPA_SENDING_CGI_RESULT_HEADERS;
-    
-    ContinueSendingCgiResultHeaders();
+    return true;
 }
 
 
@@ -355,9 +366,6 @@ void ContinueSendingCgiResultHeaders()
         return;
     }
 
-    output_data_length = cgi_output_length;
-    output_data_pointer = cgi_output_pointer;
-
     //content length = output file size minus headers length
     content_length = file_fib.fileSize - (output_data_pointer-OUTPUT_DATA_BUFFER_START);
     SendContentLengthHeader(content_length);
@@ -372,19 +380,19 @@ void ContinueSendingCgiResultHeaders()
 
 static bool GetOutputHeaderLine()
 {
-    cgi_header_pointer = cgi_output_pointer;
+    cgi_header_pointer = output_data_pointer;
     cgi_header_length = 0;
 
-    while(*cgi_output_pointer != '\n' && cgi_output_length)
+    while(*output_data_pointer != '\n' && output_data_length)
     {
-        cgi_output_pointer++;
+        output_data_pointer++;
         cgi_header_length++;
-        cgi_output_length--;
+        output_data_length--;
     }
 
     //Got to the end of the data (or the first OUTPUT_DATA_BUFFER_LENGTH bytes of the data)
     //without finding a proper end of line
-    if(cgi_output_length == 0)
+    if(output_data_length == 0)
     {
         PrintUnlessSilent("*** Malformed data received from CGI script: no headers end mark\r\n");
         SendInternalError();
@@ -393,10 +401,10 @@ static bool GetOutputHeaderLine()
     }
 
     //The \n is part of the header...
-    cgi_output_pointer++;
+    output_data_pointer++;
     //...but we want the header to be zero-terminated
     cgi_header_length--; //discard the \r
-    cgi_output_pointer[-2] = '\0';
+    output_data_pointer[-2] = '\0';
 
     return true;
 }
