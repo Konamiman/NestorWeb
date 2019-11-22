@@ -26,6 +26,8 @@ byte automaton_state;
 int output_data_length;
 byte data_buffer[256+1];
 char filename_buffer[MAX_FILE_PATH_LEN*2];
+bool request_is_get;
+bool request_is_head;
 
 static byte* data_buffer_pointer;
 static int data_buffer_length;
@@ -313,7 +315,17 @@ static bool ProcessRequestLine()
         return false;
     }
 
-    if(!strncmpi(data_buffer, "GET", 3))
+    request_is_get = false;
+    request_is_head = false;
+    if(strncmpi(data_buffer, "GET ", 4))
+    {
+        request_is_get = true;
+    }
+    else if(strncmpi(data_buffer, "HEAD ", 5))
+    {
+        request_is_head = true;
+    }
+    else
     {
         SendMethodNotAllowedError(false);
         return false;
@@ -733,6 +745,12 @@ static void StartSendingFile()
     SendLastModified();
     SendLineToClient(empty_str);
 
+    if(request_is_head)
+    {
+        CloseConnectionToClient();
+        return;
+    }
+
     output_data_length = 0;
     PrintUnlessSilent("Sending file contents...\r\n");
     automaton_state = HTTPA_SENDING_FILE_CONTENTS;
@@ -848,6 +866,12 @@ static void StartSendingDirectory()
         SendLineToClient("Transfer-Encoding: chunked");
         SendLineToClient("Cache-Control: private, max-age=" MAX_CACHE_SECS_FOR_DIRECTORY_LISTING);
         SendLineToClient(empty_str);
+
+        if(request_is_head)
+        {
+            CloseConnectionToClient();
+            return;
+        }
 
         automaton_state = HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1;
         output_data_length = 0;
