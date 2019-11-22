@@ -34,11 +34,14 @@ void ReinitializeHttpAutomaton();
 void CleanupHttpAutomaton();
 
 void DoHttpServerAutomatonStep();
-void SendInternalError();
+void SendBadRequestError();
 void SendNotFoundError();
+void SendMethodNotAllowedError(bool fromCgi);
+void SendInternalError();
 void ProcessFileOrDirectoryRequest();
 void CloseConnectionToClient();
 void SendResponseStart(int statusCode, char* statusMessage);
+void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
 bool SendLineToClient(char* line);
 bool SendCrlfTerminatedLineToClient(char* line);
 void SendContentLengthHeader(ulong length);

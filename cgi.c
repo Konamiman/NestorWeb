@@ -34,6 +34,7 @@ static int status_code;
 static char* status_message;
 static bool must_send_cgi_out_content;
 static bool must_send_cgi_contents_file;
+static int total_output_data_length;
 
 static char temp_in_filename[128];
 static char temp_out_filename[128];
@@ -193,7 +194,20 @@ void StartSendingCgiResult()
 
     if(error_code_from_cgi != 0)
     {
-        SendInternalError();
+        switch(error_code_from_cgi)
+        {
+            case 1:
+                SendBadRequestError();
+                break;
+            case 2:
+                SendNotFoundError();
+                break;
+            case 3:
+                SendMethodNotAllowedError(true);
+                break;
+            default:
+                SendInternalError();
+        }
         CloseConnectionToClient();
         return;
     }
@@ -214,6 +228,8 @@ void StartSendingCgiResult()
     output_data_length = OUTPUT_DATA_BUFFER_LENGTH;
     output_data_pointer = OUTPUT_DATA_BUFFER_START;
     error = ReadFromFile(file_handle, OUTPUT_DATA_BUFFER_START, &output_data_length);
+    output_data_pointer[output_data_length] = '\0'; //Will be useful in case the script uses X-CGI-Error
+    total_output_data_length = output_data_length;
     if(error == ERR_EOF)
     {
         SendResponseStart(204, "No Content");
@@ -259,30 +275,66 @@ void StartSendingCgiResult()
 }
 
 
+#define PSLH_PROCESSED 0
+#define PSLH_NOT_PROCESSED 1
+#define PSLH_ERROR 2
+
+static byte ProcessStatusLikeHeader(char* headerName)
+{
+    byte len;
+
+    len = strlen(headerName);
+    if(!strncmpi(cgi_header_pointer, headerName, len))
+        return PSLH_NOT_PROCESSED;
+
+    cgi_header_pointer += strlen(headerName) + 1;
+    while(*++cgi_header_pointer == ' ');
+    status_code = atoi(cgi_header_pointer);
+    if(status_code < 100 || status_code > 999)
+    {
+        if(state.verbosityLevel > VERBOSE_MODE_SILENT)
+            printf("*** Malformed data received from CGI script: invalid '%s' header\r\n", headerName);
+        SendInternalError();
+        CloseConnectionToClient();
+        return PSLH_ERROR;
+    }
+    while(*++cgi_header_pointer >= '0' && *cgi_header_pointer <= '9');
+    while(*++cgi_header_pointer == ' ');
+    status_message = cgi_header_pointer;
+
+    if(!GetOutputHeaderLine())
+        return PSLH_ERROR;
+
+    return PSLH_PROCESSED;
+}
+
+
 static bool ProcessFirstHeaderOfCgiResult()
 {
     char* tmp_pointer;
     byte error;
 
-    if(strncmpi(cgi_header_pointer, "Status:", 7))
-    {
-        cgi_header_pointer += 6;
-        while(*++cgi_header_pointer == ' ');
-        status_code = atoi(cgi_header_pointer);
-        if(status_code < 100 || status_code > 999)
-        {
-            PrintUnlessSilent("*** Malformed data received from CGI script: invalid 'Status' header\r\n");
-            SendInternalError();
-            CloseConnectionToClient();
-            return false;
-        }
-        while(*++cgi_header_pointer >= '0' && *cgi_header_pointer <= '9');
-        while(*++cgi_header_pointer == ' ');
-        status_message = cgi_header_pointer;
+    error = ProcessStatusLikeHeader("Status");
+    if(error == PSLH_ERROR)
+        return false;
+    else if(error == PSLH_PROCESSED)        
+        return true;
 
-        if(!GetOutputHeaderLine())
-            return false;
+    error = ProcessStatusLikeHeader("X-CGI-Error");
+    if(error == PSLH_ERROR)
+        return false;
+    else if(error == PSLH_PROCESSED)
+    {  
+        //We need to copy data around because SendErrorResponseToClient
+        //overwrites output_data_buffer with the generated HTML
+        strncpy(data_buffer, status_message, sizeof(data_buffer));
+        strncpy(TCP_INPUT_DATA_BUFFER_START, &cgi_header_pointer[2], TCP_INPUT_DATA_BUFFER_SIZE); //+2 to skip the end of headers empty line
+        SendErrorResponseToClient(status_code, data_buffer, TCP_INPUT_DATA_BUFFER_START);
+        CloseConnectionToClient();
+        
+        return false;
     }
+
     else if(strncmpi(cgi_header_pointer, "Location:", 9))
     {
         tmp_pointer = cgi_header_pointer+9;

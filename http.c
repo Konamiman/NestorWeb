@@ -102,7 +102,6 @@ static void UpdateInactivityCounter();
 static void ContinueReadingHeaders();
 static void ProcessHeader();
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
-static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
 static char* ConvertRequestToFilename(char** query_string_start, char** resource_start, bool is_local_redirect);
 static void StartSendingFile();
 static bool CheckIfModifiedSince();
@@ -316,7 +315,7 @@ static bool ProcessRequestLine()
 
     if(!strncmpi(data_buffer, "GET", 3))
     {
-        SendErrorResponseToClient(405, "Method Not Allowed", "Sorry, this is a GET only server for now");
+        SendMethodNotAllowedError(false);
         return false;
     }
 
@@ -508,7 +507,7 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
 }
 
 
-static void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage)
+void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage)
 {
     if(!detailedMessage)
     {
@@ -521,12 +520,15 @@ static void SendErrorResponseToClient(int statusCode, char* statusMessage, char*
             "<html>"
             "<head>"
             "<title>NestorHTTP - error</title>"
-            "<style type='text/css'>body {font-family: sans-serif;} .footer {font-size: small; color: gray; font-style: italic;}</style>"
+            "<style type='text/css'>"
+            "body {font-family: sans-serif;} .footer {font-size: small; color: gray; font-style: italic;}"
+            "a {font-size: small; color: gray; text-decoration: none;}"
+            "</style>"
             "</head>"
             "<body>"
             "<h1>%i %s</h1>"
             "<p>%s</p>"
-            "<p class='footer'>NestorHTTP " VERSION "</p>"
+            "<p class='footer'><a href=\"http://github.com/Konamiman/NestorHTTP\" target=\"_blank\">NestorHTTP " VERSION "</a></p>"
             "</body>"
             "</html>",
         statusCode,
@@ -610,9 +612,24 @@ static char* ConvertRequestToFilename(char** query_string_start, char** resource
 }
 
 
+void SendBadRequestError()
+{
+    SendErrorResponseToClient(400, "Bad Request", "Sorry, I'm not able to process your request.");
+}
+
+
 void SendNotFoundError()
 {
     SendErrorResponseToClient(404, "Not Found", "The requested resource was not found in this server");
+}
+
+
+void SendMethodNotAllowedError(bool fromCgi)
+{
+    SendErrorResponseToClient(405, "Method Not Allowed",
+      fromCgi ?
+      "The specified HTTP method can't be handled by this script" :
+      "Sorry, this is a GET only server for now");
 }
 
 
@@ -672,7 +689,7 @@ void ProcessFileOrDirectoryRequest()
     }
     else if(error != 0)
     {
-        SendErrorResponseToClient(400, "Bad Request", "Sorry, I'm not able to process your request.");
+        SendBadRequestError();
         CloseConnectionToClient();
         return;
     }
