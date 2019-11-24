@@ -26,6 +26,7 @@ extern int output_data_length;
 extern byte* output_data_pointer;
 extern byte data_buffer[256+1];
 extern char filename_buffer[MAX_FILE_PATH_LEN*2];
+extern char raw_request[MAX_FILE_PATH_LEN+1];
 
 static byte error_code_from_cgi;
 static char* cgi_header_pointer;
@@ -54,6 +55,12 @@ static const char* env_gateway_interface = "GATEWAY_INTERFACE";
 static const char* env_server_name = "SERVER_NAME";
 static const char* env_server_port = "SERVER_PORT";
 static const char* env_server_software = "SERVER_SOFTWARE";
+static const char* env_request_method = "REQUEST_METHOD";
+static const char* env_script_name = "SCRIPT_NAME";
+static const char* env_path_info = "PATH_INFO";
+static const char* env_query_string = "QUERY_STRING";
+static const char* env_server_protocol = "SERVER_PROTOCOL";
+static const char* env_path_translated = "PATH_TRANSLATED";
 
 
 static void CreateTempFilePaths()
@@ -184,6 +191,13 @@ void CleanupCgiEngine()
     DeleteEnvironmentItem(env_server_name);
     DeleteEnvironmentItem(env_server_port);
     DeleteEnvironmentItem(env_server_software);
+
+    DeleteEnvironmentItem(env_request_method);
+    DeleteEnvironmentItem(env_script_name);
+    DeleteEnvironmentItem(env_path_info);
+    DeleteEnvironmentItem(env_query_string);
+    DeleteEnvironmentItem(env_server_protocol);
+    DeleteEnvironmentItem(env_path_translated);
 }
 
 
@@ -495,6 +509,114 @@ static bool GetOutputHeaderLine()
     //...but we want the header to be zero-terminated
     cgi_header_length--; //discard the \r
     output_data_pointer[-2] = '\0';
+
+    return true;
+}
+
+
+bool SetupRequestDependantEnvItems()
+{
+    //GET /cgi-bin/myscript.cgi/foo/bar?fiz=buzz HTTP/1.1
+    //--+ +--------------------++-----+ +------+ +------+
+    //verb    script_name      path_info query_s protocol
+
+    char* pointer;
+    char* previous_pointer;
+    char* temp;
+    byte slashes_count;
+    char ch;
+
+    pointer = raw_request;
+    slashes_count = 0;
+    
+    //Verb
+
+    previous_pointer = pointer;
+    while(*++pointer != ' ');
+    *pointer = '\0';
+    SetEnvironmentItem(env_request_method, previous_pointer);
+
+    //Script name
+
+    while(*pointer++ == ' ');
+    previous_pointer = pointer;
+    while(slashes_count < 2 && (ch = *++pointer) != ' ' && ch != '?')
+    {
+        if(ch == '\0')
+        {
+            SendBadRequestError();
+            CloseConnectionToClient();
+            return false;
+        }
+        if(ch == '/') slashes_count++;
+    } 
+
+    *pointer = '\0';
+    SetEnvironmentItem(env_script_name, previous_pointer);
+
+    //Path info
+
+    if(ch == ' ' || ch == '?')
+    {
+        DeleteEnvironmentItem(env_path_info);
+        DeleteEnvironmentItem(env_path_translated);
+    }
+    else
+    {
+        *pointer = '/';
+        previous_pointer = pointer;
+
+        while((ch = *++pointer) != '?' && ch != ' ')
+        {
+            if(ch == '\0')
+            {
+                SendBadRequestError();
+                CloseConnectionToClient();
+                return false;
+            }
+        }
+
+        *pointer = '\0';
+
+        urlDecode(previous_pointer, &data_buffer[128]);
+        SetEnvironmentItem(env_path_info, &data_buffer[128]);
+
+        //Path translated (<base directory>\<path info>)
+
+        strcpy(data_buffer, state.baseDirectory);
+        strcat(data_buffer, &data_buffer[128+1]);
+        temp = data_buffer;
+        while((ch = *++temp) != '\0')
+        {
+            if(ch == '/') *temp = '\\';
+        }
+        SetEnvironmentItem(env_path_translated, data_buffer);
+    }
+
+    //Query string
+
+    previous_pointer = pointer+1;
+    if(ch == '?')
+    {
+        while((ch = *++pointer) != ' ')
+        {
+            if(ch == '\0')
+            {
+                SendBadRequestError();
+                CloseConnectionToClient();
+                return false;
+            }
+        }
+        *pointer = '\0';
+        SetEnvironmentItem(env_query_string, previous_pointer);
+    }
+    else
+        DeleteEnvironmentItem(env_query_string);
+    
+    //Protocol
+
+    while(*++pointer== ' ');
+    SetEnvironmentItem(env_server_protocol, pointer);
 
     return true;
 }

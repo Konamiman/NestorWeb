@@ -160,3 +160,29 @@ int CompareDates(dateTime* dt1, dateTime* dt2)
 
     return dt1->second - dt2->second;
 }
+
+
+static char isxdigit(unsigned char c)
+{
+    return ( c >= '0' && c <= '9') ||
+         ( c >= 'a' && c <= 'f') ||
+         ( c >= 'A' && c <= 'F');
+}
+
+
+//https://stackoverflow.com/a/20437049/4574
+void urlDecode(char *sSource, char *sDest) 
+{
+    int nLength;
+    for (nLength = 0; *sSource; nLength++) {
+        if (*sSource == '%' && sSource[1] && sSource[2] && isxdigit(sSource[1]) && isxdigit(sSource[2])) {
+            sSource[1] -= sSource[1] <= '9' ? '0' : (sSource[1] <= 'F' ? 'A' : 'a')-10;
+            sSource[2] -= sSource[2] <= '9' ? '0' : (sSource[2] <= 'F' ? 'A' : 'a')-10;
+            sDest[nLength] = 16 * sSource[1] + sSource[2];
+            sSource += 3;
+            continue;
+        }
+        sDest[nLength] = *sSource++;
+    }
+    sDest[nLength] = '\0';
+}

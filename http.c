@@ -28,6 +28,7 @@ byte data_buffer[256+1];
 char filename_buffer[MAX_FILE_PATH_LEN*2];
 bool request_is_get;
 bool request_is_head;
+char raw_request[MAX_FILE_PATH_LEN+1];
 
 static byte* data_buffer_pointer;
 static int data_buffer_length;
@@ -99,6 +100,7 @@ static void HandleIncomingConnectionIfAvailable();
 static void ContinueReadingRequest();
 static bool ProcessRequestLine();
 static bool ContinueReadingLine();
+static bool SetupCgiRequestPointers();
 static void ResetInactivityCounter();
 static void UpdateInactivityCounter();
 static void ContinueReadingHeaders();
@@ -340,22 +342,46 @@ bool ProcessRequestedResource(bool is_local_redirect)
     char* converted_filename;
     char* query_string;
     char* resource_name_start;
+    char* pointer;
     bool is_cgi_file;
     bool can_run_cgi;
+    char ch;
+
+    memcpy(raw_request, data_buffer, sizeof(requested_resource));
 
     converted_filename = ConvertRequestToFilename(&query_string, &resource_name_start, is_local_redirect);
     send_as_attachment = query_string && strncmpi(query_string, "a=1", 3);
 
     if(converted_filename)
     {
-        is_cgi_file = strncmpi(resource_name_start, "CGI-BIN", 7);
+        is_cgi_file = strncmpi(resource_name_start, "CGI-BIN\\", 8);
         can_run_cgi = !is_local_redirect && state.cgiEnabled;
         if(!(is_cgi_file && !can_run_cgi))
         {
             must_run_cgi = can_run_cgi && is_cgi_file;
+
+            if(must_run_cgi)
+            {
+                pointer = converted_filename + 8;
+                while(true)
+                {
+                    ch = *pointer;
+                    if(ch == '\\')
+                    {
+                        *pointer = '\0';
+                        break;
+                    }
+                    else if(ch == '?' || ch == '\0')
+                        break;
+
+                    pointer++;
+                }
+            }
+
             strcpy(filename_buffer, state.baseDirectory);
             strcat(filename_buffer, converted_filename);
-            return true;
+
+            return must_run_cgi ? SetupRequestDependantEnvItems() : true;
         }
     }
 

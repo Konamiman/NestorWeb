@@ -11,5 +11,6 @@ byte OpenCgiOutFileForRead(byte* file_handle);
 void CleanupCgiEngine();
 void StartSendingCgiResult();
 void ContinueSendingCgiResultHeaders();
+bool SetupRequestDependantEnvItems();
 
 #endif
