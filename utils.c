@@ -7,23 +7,17 @@
 static const char* week_days[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 static const char* months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-bool strncmpi(const char *s1, const char *s2, int len) {
+bool StringStartsWith(const char *string, const char *prefix) {
     char c1;
     char c2;
-
-    while(len--)
+    
+    while(c2 = *prefix++)
     {
-        c1 = ToLower(*s1++);
-        c2 = ToLower(*s2++);
-
-        if(c1 == 0 && c2 == 0)
-            return true;
-        
-        if(c1 != c2)
+        if(ToLower(c2) != ToLower(*string++))
             return false;
     }
 
-    return c1 == c2;
+    return true;
 }
 
 
@@ -109,7 +103,7 @@ bool ParseVerboseDateTime(char* string, dateTime* date_time)
     temp = 0;
     while(true)
     {
-        if(strncmpi(&string[8], months[temp], 3))
+        if(StringStartsWith(&string[8], months[temp]))
         {
             date_time->month = temp+1;
             break;

@@ -15,7 +15,7 @@ typedef struct {
     byte second;
 } dateTime;
 
-bool strncmpi(const char *s1, const char *s2, int len);
+bool StringStartsWith(const char *string, const char *prefix);
 void ToVerboseDate(char* dst, dateTime* date_time);
 void ToIsoDate(char* dst, dateTime* date_time);
 void ParseFibDateTime(fileInfoBlock* fib, dateTime* date_time);

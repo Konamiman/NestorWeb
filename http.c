@@ -319,11 +319,11 @@ static bool ProcessRequestLine()
 
     request_is_get = false;
     request_is_head = false;
-    if(strncmpi(data_buffer, "GET ", 4))
+    if(StringStartsWith(data_buffer, "GET "))
     {
         request_is_get = true;
     }
-    else if(strncmpi(data_buffer, "HEAD ", 5))
+    else if(StringStartsWith(data_buffer, "HEAD "))
     {
         request_is_head = true;
     }
@@ -350,11 +350,11 @@ bool ProcessRequestedResource(bool is_local_redirect)
     memcpy(raw_request, data_buffer, sizeof(requested_resource));
 
     converted_filename = ConvertRequestToFilename(&query_string, &resource_name_start, is_local_redirect);
-    send_as_attachment = query_string && strncmpi(query_string, "a=1", 3);
+    send_as_attachment = query_string && StringStartsWith(query_string, "a=1");
 
     if(converted_filename)
     {
-        is_cgi_file = strncmpi(resource_name_start, "CGI-BIN\\", 8);
+        is_cgi_file = StringStartsWith(resource_name_start, "CGI-BIN\\");
         can_run_cgi = !is_local_redirect && state.cgiEnabled;
         if(!(is_cgi_file && !can_run_cgi))
         {
@@ -482,7 +482,7 @@ static void ProcessHeader()
     if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
         printf("<-- %s\r\n", data_buffer);
 
-    if(strncmpi(data_buffer, "If-Modified-Since:", 18))
+    if(StringStartsWith(data_buffer, "If-Modified-Since:"))
     {
         has_if_modified_since = ParseVerboseDateTime(&data_buffer[18], &if_modified_since_date);
     }

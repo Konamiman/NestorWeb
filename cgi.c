@@ -126,7 +126,7 @@ void RunCgi()
     byte file_handle2;
 
     ParseFilename(file_fib.filename, data_buffer);
-    if(!strncmpi(&data_buffer[8], "CGI", 3) && !strncmpi(&data_buffer[8], "COM", 3))
+    if(!StringStartsWith(&data_buffer[8], "CGI") && !StringStartsWith(&data_buffer[8], "COM"))
     {
         SendNotFoundError();
         CloseConnectionToClient();
@@ -287,13 +287,10 @@ void StartSendingCgiResult()
 
 static byte ProcessStatusLikeHeader(char* headerName)
 {
-    byte len;
-
-    len = strlen(headerName);
-    if(!strncmpi(cgi_header_pointer, headerName, len))
+    if(!StringStartsWith(cgi_header_pointer, headerName))
         return PSLH_NOT_PROCESSED;
 
-    cgi_header_pointer += strlen(headerName) + 1;
+    cgi_header_pointer += strlen(headerName);
     while(*++cgi_header_pointer == ' ');
     status_code = atoi(cgi_header_pointer);
     if(status_code < 100 || status_code > 999)
@@ -320,13 +317,13 @@ static bool ProcessFirstHeaderOfCgiResult()
     char* tmp_pointer;
     byte error;
 
-    error = ProcessStatusLikeHeader("Status");
+    error = ProcessStatusLikeHeader("Status:");
     if(error == PSLH_ERROR)
         return false;
     else if(error == PSLH_PROCESSED)        
         return true;
 
-    error = ProcessStatusLikeHeader("X-CGI-Error");
+    error = ProcessStatusLikeHeader("X-CGI-Error:");
     if(error == PSLH_ERROR)
         return false;
     else if(error == PSLH_PROCESSED)
@@ -340,16 +337,16 @@ static bool ProcessFirstHeaderOfCgiResult()
         
         return false;
     }
-    else if(strncmpi(cgi_header_pointer, "X-CGI-Response-Type: NPH", 24))
+    else if(StringStartsWith(cgi_header_pointer, "X-CGI-Response-Type: NPH"))
     {
         PrintUnlessSilent("Sending response as NPH\r\n");
 
         automaton_state = HTTPA_SENDING_FILE_CONTENTS;
         return false;
     }
-    else if(strncmpi(cgi_header_pointer, "Location:", 9))
+    else if(StringStartsWith(cgi_header_pointer, "Location:"))
     {
-        tmp_pointer = cgi_header_pointer+9;
+        tmp_pointer = cgi_header_pointer+9; //Length of "Location:"
         while(*tmp_pointer == ' ') tmp_pointer++;
 
         if(*tmp_pointer == '/')
@@ -380,13 +377,13 @@ static bool ProcessFirstHeaderOfCgiResult()
         status_message = found_str;
         must_send_cgi_out_content = false;
     }
-    else if(strncmpi(cgi_header_pointer, "X-CGI-Content-File", 18))
+    else if(StringStartsWith(cgi_header_pointer, "X-CGI-Content-File:"))
     {
         //Value is expected to be a file path relative to CGI file location,
         //with MSX-DOS separators ('\'), without initial '\'.
         //Example: X-CGI-Location: data\myscript.dat
 
-        tmp_pointer = cgi_header_pointer+18+1;
+        tmp_pointer = cgi_header_pointer+19; //Length of "X-CGI-Content-File:"
         while(*tmp_pointer == ' ') tmp_pointer++;
 
         if(state.verbosityLevel > VERBOSE_MODE_SILENT)
