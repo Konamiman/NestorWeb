@@ -265,14 +265,6 @@ void StartSendingCgiResult()
     must_send_cgi_out_content = true;
     must_send_cgi_contents_file = false;
 
-    if(strncmpi(output_data_pointer, "HTTP/", 5))
-    {
-        PrintUnlessSilent("Sending response as NPH\r\n");
-
-        automaton_state = HTTPA_SENDING_FILE_CONTENTS;
-        return;
-    }
-
     if(!GetOutputHeaderLine())
         return;
 
@@ -348,7 +340,13 @@ static bool ProcessFirstHeaderOfCgiResult()
         
         return false;
     }
+    else if(strncmpi(cgi_header_pointer, "X-CGI-Response-Type: NPH", 24))
+    {
+        PrintUnlessSilent("Sending response as NPH\r\n");
 
+        automaton_state = HTTPA_SENDING_FILE_CONTENTS;
+        return false;
+    }
     else if(strncmpi(cgi_header_pointer, "Location:", 9))
     {
         tmp_pointer = cgi_header_pointer+9;
