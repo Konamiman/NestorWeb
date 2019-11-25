@@ -380,13 +380,13 @@ static bool ProcessFirstHeaderOfCgiResult()
         status_message = found_str;
         must_send_cgi_out_content = false;
     }
-    else if(strncmpi(cgi_header_pointer, "X-CGI-Location:", 15))
+    else if(strncmpi(cgi_header_pointer, "X-CGI-Content-File", 18))
     {
         //Value is expected to be a file path relative to CGI file location,
         //with MSX-DOS separators ('\'), without initial '\'.
         //Example: X-CGI-Location: data\myscript.dat
 
-        tmp_pointer = cgi_header_pointer+15;
+        tmp_pointer = cgi_header_pointer+18+1;
         while(*tmp_pointer == ' ') tmp_pointer++;
 
         if(state.verbosityLevel > VERBOSE_MODE_SILENT)
