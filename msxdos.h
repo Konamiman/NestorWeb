@@ -202,6 +202,7 @@
 #define FILE_OPEN_NO_READ (1 << 1)
 #define FILE_OPEN_INHERITABLE (1 << 2)
 
+#define MAX_COMMAND_LINE_LENGTH 127
 
 // Data structures
 

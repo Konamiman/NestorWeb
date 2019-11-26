@@ -21,6 +21,6 @@ void ToIsoDate(char* dst, dateTime* date_time);
 void ParseFibDateTime(fileInfoBlock* fib, dateTime* date_time);
 bool ParseVerboseDateTime(char* string, dateTime* date_time);
 int CompareDates(dateTime* dt1, dateTime* dt2);
-void urlDecode(char *sSource, char *sDest);
+void UrlDecode(char *sSource, char *sDest, bool plusIsSpace);
 
 #endif

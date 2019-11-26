@@ -40,12 +40,14 @@ static int total_output_data_length;
 static char temp_in_filename[128];
 static char temp_out_filename[128];
 static char cgi_contents_filename[128];
+static char script_command_line[MAX_COMMAND_LINE_LENGTH+1];
 
 #define PrintUnlessSilent(s) { if(state.verbosityLevel > VERBOSE_MODE_SILENT) printf(s); }
 
 
 static bool GetOutputHeaderLine();
 static bool ProcessFirstHeaderOfCgiResult();
+static void SetupScriptCommandLine(char* queryString);
 
 
 static const char* ok_str = "Ok";
@@ -164,7 +166,7 @@ void RunCgi()
     //Unfortunately we can't use file_fib here, since the messing with STDOUT above
     //spoils the contents of the buffer returned by _WPATH, and thus the CGI program
     //would receive an incorrect value for the PROGRAM environment item.
-    error = proc_fork(filename_buffer, null, &state);
+    error = proc_fork(filename_buffer, script_command_line, &state);
 
     //If we get here there was an error while attempting to fork
 
@@ -573,7 +575,7 @@ bool SetupRequestDependantEnvItems()
 
         *pointer = '\0';
 
-        urlDecode(previous_pointer, &data_buffer[128]);
+        UrlDecode(previous_pointer, &data_buffer[128], false);
         SetEnvironmentItem(env_path_info, &data_buffer[128]);
 
         //Path translated (<base directory>\<path info>)
@@ -604,9 +606,13 @@ bool SetupRequestDependantEnvItems()
         }
         *pointer = '\0';
         SetEnvironmentItem(env_query_string, previous_pointer);
+        SetupScriptCommandLine(previous_pointer);
     }
     else
+    {
         DeleteEnvironmentItem(env_query_string);
+        SetupScriptCommandLine(null);
+    }
     
     //Protocol
 
@@ -614,4 +620,16 @@ bool SetupRequestDependantEnvItems()
     SetEnvironmentItem(env_server_protocol, pointer);
 
     return true;
+}
+
+
+void SetupScriptCommandLine(char* queryString)
+{
+    if(queryString == null || strlen(queryString) > MAX_COMMAND_LINE_LENGTH || strchr(queryString, '='))
+    {
+        *script_command_line = '\0';
+        return;
+    }
+
+    UrlDecode(queryString, script_command_line, true);
 }

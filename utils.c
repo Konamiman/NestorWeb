@@ -165,18 +165,27 @@ static char isxdigit(unsigned char c)
 
 
 //https://stackoverflow.com/a/20437049/4574
-void urlDecode(char *sSource, char *sDest) 
+void UrlDecode(char *sSource, char *sDest, bool plusIsSpace) 
 {
     int nLength;
+    char ch;
+
     for (nLength = 0; *sSource; nLength++) {
-        if (*sSource == '%' && sSource[1] && sSource[2] && isxdigit(sSource[1]) && isxdigit(sSource[2])) {
+        if ((ch = *sSource) == '+' && plusIsSpace)
+        {
+            sDest[nLength] = ' ';
+            sSource++;
+            continue;
+        }
+        if (ch == '%' && sSource[1] && sSource[2] && isxdigit(sSource[1]) && isxdigit(sSource[2])) {
             sSource[1] -= sSource[1] <= '9' ? '0' : (sSource[1] <= 'F' ? 'A' : 'a')-10;
             sSource[2] -= sSource[2] <= '9' ? '0' : (sSource[2] <= 'F' ? 'A' : 'a')-10;
             sDest[nLength] = 16 * sSource[1] + sSource[2];
             sSource += 3;
             continue;
         }
-        sDest[nLength] = *sSource++;
+        sDest[nLength] = ch;
+        sSource++;
     }
     sDest[nLength] = '\0';
 }

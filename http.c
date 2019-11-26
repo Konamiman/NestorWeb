@@ -28,7 +28,7 @@ byte data_buffer[256+1];
 char filename_buffer[MAX_FILE_PATH_LEN*2];
 bool request_is_get;
 bool request_is_head;
-char raw_request[MAX_FILE_PATH_LEN+1];
+char raw_request[256+1];
 
 static byte* data_buffer_pointer;
 static int data_buffer_length;
@@ -130,7 +130,7 @@ static void InitializeDataBuffer()
 {
     data_buffer_pointer = data_buffer; 
     data_buffer_length = 0;
-    skipping_data = 0;
+    skipping_data = false;
     ResetInactivityCounter();
 }
 
@@ -347,7 +347,7 @@ bool ProcessRequestedResource(bool is_local_redirect)
     bool can_run_cgi;
     char ch;
 
-    memcpy(raw_request, data_buffer, sizeof(requested_resource));
+    strcpy(raw_request, data_buffer);
 
     converted_filename = ConvertRequestToFilename(&query_string, &resource_name_start, is_local_redirect);
     send_as_attachment = query_string && StringStartsWith(query_string, "a=1");

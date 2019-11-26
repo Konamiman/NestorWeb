@@ -517,8 +517,7 @@ RUN_SCRIPT:
 
     jp 0x100
 
-DIR_RET_POINTER:
-    .ds 2    ;Zero, so RET with original stack pointer is equivalent to JP 0
+    .dw 0    ;Zero, so RET with original stack pointer is equivalent to JP 0
 RUN_SCRIPT_END:
 
 
