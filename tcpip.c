@@ -187,3 +187,15 @@ bool SendStringToTcpConnection(char* string)
 {
     return SendDataToTcpConnection(string, strlen(string));
 }
+
+
+byte GetRemoteIpAddress(byte* ipBuffer)
+{
+    regs.Bytes.B = state.tcpConnectionNumber;
+    regs.Words.HL = (int)TCP_INPUT_DATA_BUFFER_START;
+    UnapiCall(&state.unapiCodeBlock, TCPIP_TCP_STATE, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A == 0)
+        memcpy(ipBuffer, TCP_INPUT_DATA_BUFFER_START, 4);
+    
+    return regs.Bytes.A;
+}

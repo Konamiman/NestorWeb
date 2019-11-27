@@ -196,7 +196,7 @@ void InitializeInfoArea(char* ip, uint port)
     function_keys_were_visible = FunctionKeysAreVisible();
     memcpy(function_keys_backup, F_KEY_CONTENTS_POINTER(1), sizeof(function_keys_backup));
     SetFunctionKeyContents(1, "Server address:");
-    sprintf(buffer, "%i.%i.%i.%i", ip[0], ip[1], ip[2], ip[3]);
+    FormatIpAddress(buffer, ip);
     SetFunctionKeyContents(2, buffer);
     sprintf(buffer, "Port: %u", port);
     SetFunctionKeyContents(3, buffer);

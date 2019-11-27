@@ -22,5 +22,6 @@ void ParseFibDateTime(fileInfoBlock* fib, dateTime* date_time);
 bool ParseVerboseDateTime(char* string, dateTime* date_time);
 int CompareDates(dateTime* dt1, dateTime* dt2);
 void UrlDecode(char *sSource, char *sDest, bool plusIsSpace);
+void FormatIpAddress(char* dst, byte* address_bytes);
 
 #endif

@@ -189,3 +189,9 @@ void UrlDecode(char *sSource, char *sDest, bool plusIsSpace)
     }
     sDest[nLength] = '\0';
 }
+
+
+void FormatIpAddress(char* dst, byte* address_bytes)
+{
+    sprintf(dst, "%i.%i.%i.%i", address_bytes[0], address_bytes[1], address_bytes[2], address_bytes[3]);
+}

@@ -74,5 +74,7 @@ bool EnsureIncomingTcpDataIsAvailable();
 byte GetIncomingTcpByte();
 bool SendDataToTcpConnection(byte* data, int length);
 bool SendStringToTcpConnection(char* string);
+byte GetRemoteIpAddress(byte* ipBuffer);
+
 
 

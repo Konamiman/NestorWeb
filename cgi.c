@@ -63,6 +63,7 @@ static const char* env_path_info = "PATH_INFO";
 static const char* env_query_string = "QUERY_STRING";
 static const char* env_server_protocol = "SERVER_PROTOCOL";
 static const char* env_path_translated = "PATH_TRANSLATED";
+static const char* env_remote_addr = "REMOTE_ADDR";
 
 
 static void CreateTempFilePaths()
@@ -78,7 +79,7 @@ static void InitializeFixedEnvItems()
 {
     SetEnvironmentItem(env_gateway_interface, "CGI/1.1");
     
-    sprintf(data_buffer, "%i.%i.%i.%i", state.localIp[0], state.localIp[1], state.localIp[2], state.localIp[2]);
+    FormatIpAddress(data_buffer, state.localIp);
     SetEnvironmentItem(env_server_name, data_buffer);
 
     sprintf(data_buffer, "%i", state.tcpPort);
@@ -200,6 +201,7 @@ void CleanupCgiEngine()
     DeleteEnvironmentItem(env_query_string);
     DeleteEnvironmentItem(env_server_protocol);
     DeleteEnvironmentItem(env_path_translated);
+    DeleteEnvironmentItem(env_remote_addr);
 }
 
 
@@ -618,6 +620,12 @@ bool SetupRequestDependantEnvItems()
 
     while(*++pointer== ' ');
     SetEnvironmentItem(env_server_protocol, pointer);
+
+    //Remote IP address
+
+    GetRemoteIpAddress(data_buffer);
+    FormatIpAddress(data_buffer+17, data_buffer);
+    SetEnvironmentItem(env_remote_addr, data_buffer+17);
 
     return true;
 }
