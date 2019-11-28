@@ -41,6 +41,7 @@ static char temp_in_filename[128];
 static char temp_out_filename[128];
 static char cgi_contents_filename[128];
 static char script_command_line[MAX_COMMAND_LINE_LENGTH+1];
+static char header_name_buffer[128];
 
 #define PrintUnlessSilent(s) { if(state.verbosityLevel > VERBOSE_MODE_SILENT) printf(s); }
 
@@ -52,6 +53,7 @@ static void SetupScriptCommandLine(char* queryString);
 
 static const char* ok_str = "Ok";
 static const char* found_str = "Found";
+static const char* http_prefix_str = "HTTP_";
 
 static const char* env_gateway_interface = "GATEWAY_INTERFACE";
 static const char* env_server_name = "SERVER_NAME";
@@ -64,6 +66,8 @@ static const char* env_query_string = "QUERY_STRING";
 static const char* env_server_protocol = "SERVER_PROTOCOL";
 static const char* env_path_translated = "PATH_TRANSLATED";
 static const char* env_remote_addr = "REMOTE_ADDR";
+static const char* env_content_type = "CONTENT_TYPE";
+static const char* env_content_length = "CONTENT_LENGTH";
 
 
 static void CreateTempFilePaths()
@@ -72,6 +76,12 @@ static void CreateTempFilePaths()
     strcat(temp_in_filename, "_NHTTPIN.$");
     strcpy(temp_out_filename, temp_directory);
     strcat(temp_out_filename, "_NHTTPOUT.$");
+}
+
+
+static void InitializeDataBuffers()
+{
+    strcpy(header_name_buffer, http_prefix_str);
 }
 
 
@@ -93,6 +103,7 @@ void InitializeCgiEngine()
 {
     CreateTempFilePaths();
     InitializeFixedEnvItems();
+    InitializeDataBuffers();
     state.stdoutFileHandleCopy = 0xFF;
 }
 
@@ -113,9 +124,10 @@ void ReinitializeCgiEngine(byte errorCodeFromCgi)
 {
     CreateTempFilePaths();
     RestoreStdoutFileHandle();
+    InitializeDataBuffers();
 
     if(state.verbosityLevel > VERBOSE_MODE_SILENT)
-        printf("CGI script returned error code %i\r\n", errorCodeFromCgi);
+        printf("CGI script returned error code %xh\r\n", errorCodeFromCgi);
 
     error_code_from_cgi = errorCodeFromCgi;
     StartSendingCgiResult();
@@ -202,6 +214,8 @@ void CleanupCgiEngine()
     DeleteEnvironmentItem(env_server_protocol);
     DeleteEnvironmentItem(env_path_translated);
     DeleteEnvironmentItem(env_remote_addr);
+
+    CleanupHeaderBasedEnvItems();
 }
 
 
@@ -640,4 +654,67 @@ void SetupScriptCommandLine(char* queryString)
     }
 
     UrlDecode(queryString, script_command_line, true);
+}
+
+
+void ProcessHeaderForCgi()
+{
+    char* pointer;
+    char* value_pointer;
+    char ch;
+    bool skip_prefix;
+    
+    if(StringStartsWith(data_buffer, "Connection:") || StringStartsWith(data_buffer, "Upgrade-Insecure-Requests:"))
+        return;
+
+    skip_prefix = StringStartsWith(data_buffer, "Content-Type:") || StringStartsWith(data_buffer, "Content-Length:");
+
+    pointer = data_buffer;
+
+    while((ch = *pointer) != ':')
+    {
+        if(ch == '-')
+            *pointer = '_';
+        else if(ch >= 'a' && ch <= 'z')
+            *pointer = ToUpper(ch);
+
+        pointer++;
+    }
+
+    *pointer++ = '\0';
+    while(*pointer == ' ') pointer++;
+    value_pointer = pointer;
+
+    if(skip_prefix)
+    {
+        pointer = data_buffer;
+    }
+    else
+    {
+        strcpy(header_name_buffer+5, data_buffer);
+        pointer = header_name_buffer;
+    }
+        
+
+    SetEnvironmentItem(pointer, value_pointer);
+}
+
+
+void CleanupHeaderBasedEnvItems()
+{
+    int index;
+
+    DeleteEnvironmentItem(env_content_type);
+    DeleteEnvironmentItem(env_content_length);
+
+    index = 1;
+    while(FindEnvironmentItem(index, OUTPUT_DATA_BUFFER_START))
+    {
+        //Increase index only if no deletion happens because
+        //when we delete item N the previous N+1 item becomes the new N.
+        if(StringStartsWith(OUTPUT_DATA_BUFFER_START, http_prefix_str))
+            DeleteEnvironmentItem(OUTPUT_DATA_BUFFER_START);
+        else
+            index++;
+    }
 }

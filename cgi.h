@@ -12,5 +12,7 @@ void CleanupCgiEngine();
 void StartSendingCgiResult();
 void ContinueSendingCgiResultHeaders();
 bool SetupRequestDependantEnvItems();
+void ProcessHeaderForCgi();
+void CleanupHeaderBasedEnvItems();
 
 #endif

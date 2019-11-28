@@ -5,6 +5,7 @@
 #include "msxdos.h"
 
 #define ToLower(c) ((c) | 32)
+#define ToUpper(c) ((c) & ~32)
 
 typedef struct {
     int year;

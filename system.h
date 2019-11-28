@@ -41,7 +41,7 @@ void SetFunctionKeyContents(int key, char* contents);
 bool GetEnvironmentItem(const char* name, char* value);
 byte SetEnvironmentItem(const char* name, char* value);
 #define DeleteEnvironmentItem(name) SetEnvironmentItem(name, empty_str)
-void FindEnvironmentItem(uint index, char* name);
+bool FindEnvironmentItem(uint index, char* name);
 char* GetPointerToLastItemOfPathname(const char* pathname);
 byte DuplicateFileHandle(byte fileHandle, byte* duplicatedFileHandle);
 byte DeleteFile(char* path);

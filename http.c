@@ -105,6 +105,7 @@ static void ResetInactivityCounter();
 static void UpdateInactivityCounter();
 static void ContinueReadingHeaders();
 static void ProcessHeader();
+static void ProcessHeaderForStaticContent();
 static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* content);
 static char* ConvertRequestToFilename(char** query_string_start, char** resource_start, bool is_local_redirect);
 static void StartSendingFile();
@@ -376,6 +377,8 @@ bool ProcessRequestedResource(bool is_local_redirect)
 
                     pointer++;
                 }
+
+                CleanupHeaderBasedEnvItems();
             }
 
             strcpy(filename_buffer, state.baseDirectory);
@@ -479,6 +482,17 @@ static void ContinueReadingHeaders()
 
 static void ProcessHeader()
 {
+    if(must_run_cgi)
+        ProcessHeaderForCgi();
+    else
+        ProcessHeaderForStaticContent();
+
+    InitializeDataBuffer();
+}
+
+
+static void ProcessHeaderForStaticContent()
+{
     if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
         printf("<-- %s\r\n", data_buffer);
 
@@ -486,8 +500,6 @@ static void ProcessHeader()
     {
         has_if_modified_since = ParseVerboseDateTime(&data_buffer[18], &if_modified_since_date);
     }
-
-    InitializeDataBuffer();
 }
 
 

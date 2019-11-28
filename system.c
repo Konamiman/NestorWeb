@@ -226,11 +226,13 @@ byte SetEnvironmentItem(const char* name, const char* value)
 }
 
 
-void FindEnvironmentItem(uint index, char* name)
+bool FindEnvironmentItem(uint index, char* name)
 {
     regs.UWords.DE = index;
     regs.Words.HL = (int)name;
+    regs.Bytes.B = 255;
     DosCall(F_FENV, &regs, REGS_MAIN, REGS_NONE);
+    return *name != '\0';
 }
 
 
