@@ -20,6 +20,7 @@ enum HttpAutomatonStates {
     HTTPA_LISTENING,
     HTTPA_READING_REQUEST,
     HTTPA_READING_HEADERS,
+    HTTPA_READING_BODY,
     HTTPA_SENDING_FILE_CONTENTS,
     HTTPA_SENDING_DIRECTORY_LISTING_HEADER_1,
     HTTPA_SENDING_DIRECTORY_LISTING_HEADER_2,
@@ -32,7 +33,6 @@ enum HttpAutomatonStates {
 void InitializeHttpAutomaton();
 void ReinitializeHttpAutomaton();
 void CleanupHttpAutomaton();
-
 void DoHttpServerAutomatonStep();
 void SendBadRequestError();
 void SendNotFoundError();
@@ -40,6 +40,7 @@ void SendMethodNotAllowedError(bool fromCgi);
 void SendInternalError();
 void ProcessFileOrDirectoryRequest();
 void CloseConnectionToClient();
+bool CheckConnectionIsStillOpenByClient();
 void SendResponseStart(int statusCode, char* statusMessage);
 void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detailedMessage);
 bool SendLineToClient(char* line);

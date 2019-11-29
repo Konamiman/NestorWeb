@@ -27,6 +27,10 @@ extern byte* output_data_pointer;
 extern byte data_buffer[256+1];
 extern char filename_buffer[MAX_FILE_PATH_LEN*2];
 extern char raw_request[MAX_FILE_PATH_LEN+1];
+extern long input_content_length;
+extern bool input_content_length_received;
+extern bool request_is_get;
+extern bool request_is_head;
 
 static byte error_code_from_cgi;
 static char* cgi_header_pointer;
@@ -105,6 +109,7 @@ void InitializeCgiEngine()
     InitializeFixedEnvItems();
     InitializeDataBuffers();
     state.stdoutFileHandleCopy = 0xFF;
+    state.stdinFileHandleCopy = 0xFF;
 }
 
 
@@ -120,11 +125,25 @@ static void RestoreStdoutFileHandle()
 }
 
 
+void RestoreStdinFileHandle()
+{
+    if(state.stdinFileHandleCopy != 0xFF)
+    {
+        CloseFile(STDIN);
+        DuplicateFileHandle(state.stdinFileHandleCopy, null);
+        CloseFile(state.stdinFileHandleCopy);
+        state.stdinFileHandleCopy = 0xFF;
+    }
+}
+
+
 void ReinitializeCgiEngine(byte errorCodeFromCgi)
 {
     CreateTempFilePaths();
     RestoreStdoutFileHandle();
+    RestoreStdinFileHandle();
     InitializeDataBuffers();
+    DisableDiskErrorPrompt();
 
     if(state.verbosityLevel > VERBOSE_MODE_SILENT)
         printf("CGI script returned error code %xh\r\n", errorCodeFromCgi);
@@ -176,6 +195,8 @@ void RunCgi()
     DuplicateFileHandle(file_handle, null);
     CloseFile(file_handle);
 
+    state.requestMethodType = request_is_get ? REQUEST_METHOD_GET : request_is_head ? REQUEST_METHOD_HEAD : REQUEST_METHOD_OTHER;
+
     //Unfortunately we can't use file_fib here, since the messing with STDOUT above
     //spoils the contents of the buffer returned by _WPATH, and thus the CGI program
     //would receive an incorrect value for the PROGRAM environment item.
@@ -192,15 +213,89 @@ void RunCgi()
 }
 
 
-byte OpenCgiOutFileForRead(byte* file_handle)
+bool CreateAndRedirectInFile()
 {
-    return OpenFile(temp_out_filename, file_handle, FILE_OPEN_NO_WRITE);
+    byte error;
+
+    if(!input_content_length_received && !request_is_get && !request_is_head)
+    {
+        PrintUnlessSilent("*** Content-Length header not received\r\n");
+        SendBadRequestError();
+        CloseConnectionToClient();
+        return false;
+    }
+
+    error = CreateFile(temp_in_filename, &file_handle, FILE_OPEN_INHERITABLE); //File handle will be STDIN
+    if(error)
+    {
+        if(state.verbosityLevel > VERBOSE_MODE_SILENT)
+            printf("*** Error cretating temp in file: %xh\r\n", error);
+        
+        SendInternalError();
+        CloseConnectionToClient();
+        return false;
+    }
+
+    error = DuplicateFileHandle(STDIN, &state.stdinFileHandleCopy);
+    if(error)
+    {
+        if(state.verbosityLevel > VERBOSE_MODE_SILENT)
+            printf("*** Error duplicating STDIN: %xh\r\n", error);
+        
+        SendInternalError();
+        CloseConnectionToClient();
+        return false;
+    }
+
+    CloseFile(STDIN);
+    DuplicateFileHandle(file_handle, null);
+    CloseFile(file_handle);
+
+    return true;
+}
+
+
+void ContinueReadingBody()
+{
+    int count;
+    byte error;
+
+    if(!CheckConnectionIsStillOpenByClient())
+        return;
+
+    count = TCP_INPUT_DATA_BUFFER_SIZE;
+    if(count > input_content_length)
+        count = input_content_length;
+
+    EnsureIncomingTcpDataIsAvailable();
+    count = GetIncomingTcpData(TCP_INPUT_DATA_BUFFER_START, count);
+    if(count == 0)
+        return;
+
+    error = WriteToFile(STDIN, TCP_INPUT_DATA_BUFFER_START, count);
+    if(error)
+    {
+        if(state.verbosityLevel > VERBOSE_MODE_SILENT)
+            printf("*** Error writing to SDTDIN file: %xh\r\n", error);
+
+        SendInternalError();
+        CloseConnectionToClient();
+        return;    
+    }
+    
+    input_content_length -= count;
+    if(input_content_length == 0)
+    {
+        RewindFile(STDIN);
+        ProcessFileOrDirectoryRequest();
+    }
 }
 
 
 void CleanupCgiEngine()
 {
     DeleteFile(temp_out_filename);
+    DeleteFile(temp_in_filename);
 
     DeleteEnvironmentItem(env_gateway_interface);
     DeleteEnvironmentItem(env_server_name);
@@ -280,7 +375,7 @@ void StartSendingCgiResult()
         return;
     }
 
-    must_send_cgi_out_content = true;
+    must_send_cgi_out_content = !request_is_head;
     must_send_cgi_contents_file = false;
 
     if(!GetOutputHeaderLine())
@@ -465,6 +560,7 @@ void ContinueSendingCgiResultHeaders()
     if(must_send_cgi_contents_file)
     {
         CloseFile(file_handle);
+
         error = OpenFile(&file_fib, &file_handle, FILE_OPEN_NO_WRITE);
         if(error)
         {
@@ -519,6 +615,7 @@ static bool GetOutputHeaderLine()
 
     //The \n is part of the header...
     output_data_pointer++;
+    output_data_length--;
     //...but we want the header to be zero-terminated
     cgi_header_length--; //discard the \r
     output_data_pointer[-2] = '\0';
@@ -663,11 +760,30 @@ void ProcessHeaderForCgi()
     char* value_pointer;
     char ch;
     bool skip_prefix;
+    bool no_body;
+
+    no_body = request_is_get || request_is_head;
     
     if(StringStartsWith(data_buffer, "Connection:") || StringStartsWith(data_buffer, "Upgrade-Insecure-Requests:"))
         return;
 
-    skip_prefix = StringStartsWith(data_buffer, "Content-Type:") || StringStartsWith(data_buffer, "Content-Length:");
+    if(StringStartsWith(data_buffer, "Content-Length:"))
+    {
+        if(no_body)
+            return;
+
+        input_content_length_received = true;
+        pointer = &data_buffer[15];
+        while(*pointer == ' ') pointer++;
+        input_content_length = atol(pointer);
+        skip_prefix = true;
+    }
+    else
+    {
+        skip_prefix = StringStartsWith(data_buffer, "Content-Type:");
+        if(skip_prefix && no_body) 
+            return;
+    }
 
     pointer = data_buffer;
 

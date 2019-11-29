@@ -130,6 +130,16 @@ byte ReadFromFile(byte file_handle, byte* destination, int* length)
 }
 
 
+byte WriteToFile(byte file_handle, byte* source, int length)
+{
+    regs.Bytes.B = file_handle;
+    regs.Words.DE = (int)source;
+    regs.Words.HL = length;
+    DosCall(F_WRITE, &regs, REGS_MAIN, REGS_AF);
+    return regs.Bytes.A;
+}
+
+
 void CloseFile(byte file_handle)
 {
     regs.Bytes.B = file_handle;
@@ -272,4 +282,14 @@ byte ParseFilename(const char* fileName, char* expandedFilename)
     regs.Words.HL = (int)expandedFilename;
     DosCall(F_PFILE, &regs, REGS_MAIN, REGS_AF);
     return regs.Bytes.A;
+}
+
+
+void RewindFile(byte fileHandle)
+{
+    regs.Bytes.B = fileHandle;
+    regs.Bytes.A = 0; //Relative to beginning of file_handle
+    regs.Words.DE = 0;
+    regs.Words.HL = 0;
+    DosCall(F_SEEK, &regs, REGS_MAIN, REGS_NONE);
 }

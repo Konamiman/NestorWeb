@@ -56,7 +56,7 @@ void Cleanup();
 bool GetTempDirectory();
 
 
-#define ExitRequested() KeyIsPressed()
+#define ExitRequested() (state.stdinFileHandleCopy == 0xFF && KeyIsPressed())
 #define HttpAutomatonHasReportedAFatalError() (http_error_buffer[0] != '\0')
 
 int main(char** argv, int argc)

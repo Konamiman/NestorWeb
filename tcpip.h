@@ -72,6 +72,7 @@ byte GetSimplifiedTcpConnectionState();
 bool CloseTcpConnection();
 bool EnsureIncomingTcpDataIsAvailable();
 byte GetIncomingTcpByte();
+int GetIncomingTcpData(byte* buffer, int count);
 bool SendDataToTcpConnection(byte* data, int length);
 bool SendStringToTcpConnection(char* string);
 byte GetRemoteIpAddress(byte* ipBuffer);

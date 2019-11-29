@@ -9,6 +9,7 @@
 #include "proc.h"
 #include "cgi.h"
 #include "buffers.h"
+#include "system.h"
 #include <string.h>
 
 #define MAX_CACHE_SECS_FOR_DIRECTORY_LISTING "3600"
@@ -29,6 +30,8 @@ char filename_buffer[MAX_FILE_PATH_LEN*2];
 bool request_is_get;
 bool request_is_head;
 char raw_request[256+1];
+long input_content_length;
+bool input_content_length_received;
 
 static byte* data_buffer_pointer;
 static int data_buffer_length;
@@ -157,6 +160,8 @@ void InitializeHttpAutomaton()
 void ReinitializeHttpAutomaton()
 {
     InitializeHttpAutomatonData();
+    request_is_get = state.requestMethodType == REQUEST_METHOD_GET;
+    request_is_head = state.requestMethodType == REQUEST_METHOD_HEAD;
 }
 
 
@@ -189,6 +194,9 @@ void DoHttpServerAutomatonStep()
             break;
         case HTTPA_READING_HEADERS:
             ContinueReadingHeaders();
+            break;
+        case HTTPA_READING_BODY:
+            ContinueReadingBody();
             break;
         case HTTPA_SENDING_FILE_CONTENTS:
             ContinueSendingFile();
@@ -272,6 +280,30 @@ void CloseConnectionToClient()
     }
 
     has_if_modified_since = false;
+
+    RestoreStdinFileHandle();
+}
+
+
+bool CheckConnectionIsStillOpenByClient()
+{
+    byte status;
+
+    status = GetSimplifiedTcpConnectionState();
+    switch(status)
+    {
+        case TCP_STATE_CLOSED:
+            PrintUnlessSilent(connection_lost_str);
+            CloseConnectionToClient();
+            return false;
+        
+        case TCP_STATE_CLOSE_WAIT:
+            PrintUnlessSilent(connection_closed_by_client_str);
+            CloseConnectionToClient();
+            return false;
+    }
+
+    return true;
 }
 
 
@@ -280,20 +312,8 @@ static void ContinueReadingRequest()
     byte status;
     bool lineComplete;
 
-    status = GetSimplifiedTcpConnectionState();
-    switch(status)
-    {
-        case TCP_STATE_CLOSED:
-            PrintUnlessSilent(connection_lost_str);
-            CloseConnectionToClient();
-            return;
-        
-        case TCP_STATE_CLOSE_WAIT:
-            PrintUnlessSilent(connection_closed_by_client_str);
-            CloseConnectionToClient();
-            return;
-    }
-
+    if(!CheckConnectionIsStillOpenByClient())
+        return;
 
     lineComplete = ContinueReadingLine();
     if(!lineComplete)
@@ -302,6 +322,7 @@ static void ContinueReadingRequest()
     if(ProcessRequestLine())
     {
         InitializeDataBuffer();
+        input_content_length_received = false;
         automaton_state = HTTPA_READING_HEADERS;
     }
 }
@@ -328,13 +349,18 @@ static bool ProcessRequestLine()
     {
         request_is_head = true;
     }
-    else
+
+    if(!ProcessRequestedResource(false))
+        return false;
+    
+    if(!must_run_cgi && !request_is_get && !request_is_head)
     {
         SendMethodNotAllowedError(false);
+        CloseConnectionToClient();
         return false;
     }
 
-    return ProcessRequestedResource(false);
+    return true;
 }
 
 
@@ -453,6 +479,7 @@ static void ContinueReadingHeaders()
 {
     bool lineComplete;
     bool status;
+    byte error;
 
     status = GetSimplifiedTcpConnectionState();
     switch(status)
@@ -474,9 +501,22 @@ static void ContinueReadingHeaders()
         return;
 
     if(data_buffer_length > 0)
+    {
         ProcessHeader();
-    else
-        ProcessFileOrDirectoryRequest();
+        return;
+    }
+    
+    EnsureIncomingTcpDataIsAvailable();
+    GetIncomingTcpByte();   //Discard the \n of the blank line after headers
+    
+    if(must_run_cgi && CreateAndRedirectInFile() && !request_is_head && !request_is_get)
+    {
+        automaton_state = HTTPA_READING_BODY;
+        return;
+    }
+
+    //Static content, or CGI request without body
+    ProcessFileOrDirectoryRequest();
 }
 
 

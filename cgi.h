@@ -4,10 +4,12 @@
 #include "types.h"
 
 void InitializeCgiEngine();
+void RestoreStdinFileHandle();
 void ReinitializeCgiEngine(byte errorCodeFromCgi);
 void RunCgi();
 void SendResultAfterCgi();
-byte OpenCgiOutFileForRead(byte* file_handle);
+bool CreateAndRedirectInFile();
+void ContinueReadingBody();
 void CleanupCgiEngine();
 void StartSendingCgiResult();
 void ContinueSendingCgiResultHeaders();

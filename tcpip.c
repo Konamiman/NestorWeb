@@ -170,6 +170,18 @@ byte GetIncomingTcpByte()
 }
 
 
+int GetIncomingTcpData(byte* buffer, int count)
+{
+    if(count > data_buffer_length)
+        count = data_buffer_length;
+
+    memcpy(buffer, data_buffer_pointer, count);
+    data_buffer_pointer += count;
+    data_buffer_length -= count;
+    return count;
+}
+
+
 bool SendDataToTcpConnection(byte* data, int length)
 {
     regs.Bytes.B = state.tcpConnectionNumber;
