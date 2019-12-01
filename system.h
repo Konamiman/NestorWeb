@@ -13,6 +13,7 @@
 
 #define ERAFNK 0x00CC
 #define DSPFNK 0x00CF
+#define INIFNK 0x003E
 #define CNSDFG 0xF3DE //0=display function keys, other=hide
 #define FNKSTR 0xF87F //Function key contents (10 x 16 bytes)
 #define F_KEY_CONTENTS_LENGTH 16
@@ -38,6 +39,7 @@ void DisableDiskErrorPrompt();
 bool FunctionKeysAreVisible();
 void DisplayFunctionKeys();
 void HideFunctionKeys();
+void InitializeFunctionKeysContents();
 void SetFunctionKeyContents(int key, char* contents);
 bool GetEnvironmentItem(const char* name, char* value);
 byte SetEnvironmentItem(const char* name, char* value);

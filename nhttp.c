@@ -45,7 +45,6 @@ byte buffer[64];
 byte buffer2[64];
 
 static bool function_keys_were_visible;
-static char function_keys_backup[5 * F_KEY_CONTENTS_LENGTH];
 
 void ProcessArguments(char** argv, int argc);
 void Initialize();
@@ -194,7 +193,6 @@ void InitializeInfoArea(char* ip, uint port)
     byte buffer[16];
 
     function_keys_were_visible = FunctionKeysAreVisible();
-    memcpy(function_keys_backup, F_KEY_CONTENTS_POINTER(1), sizeof(function_keys_backup));
     SetFunctionKeyContents(1, "Server address:");
     FormatIpAddress(buffer, ip);
     SetFunctionKeyContents(2, buffer);
@@ -220,7 +218,7 @@ void Cleanup()
     DeleteEnvironmentItem(temp_directory_backup_env_item);
 
     HideFunctionKeys();
-    memcpy(F_KEY_CONTENTS_POINTER(1), function_keys_backup, sizeof(function_keys_backup));
+    InitializeFunctionKeysContents();
 }
 
 

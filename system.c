@@ -209,6 +209,12 @@ void HideFunctionKeys()
 }
 
 
+void InitializeFunctionKeysContents()
+{
+    BiosCall(INIFNK, &regs, REGS_NONE);
+}
+
+
 void SetFunctionKeyContents(int key, char* contents)
 {
     memset(F_KEY_CONTENTS_POINTER(key), (int)' ', F_KEY_CONTENTS_LENGTH);
