@@ -77,6 +77,12 @@ void ParseFibDateTime(fileInfoBlock* fib, dateTime* date_time)
      Bits  4...0 - SECONDS/2 (0..29)
     */
 
+    if(fib->dateOfModification == 0)
+    {
+        date_time->year = 0;
+        return;
+    }
+
     date_time->year = ((fib->dateOfModification >> 9) & 0x7F) + 1980;
     date_time->month = (fib->dateOfModification >> 5) & 0xF;
     date_time->day = fib->dateOfModification & 0x1F;

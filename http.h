@@ -38,6 +38,7 @@ void SendBadRequestError();
 void SendNotFoundError();
 void SendMethodNotAllowedError(bool fromCgi);
 void SendInternalError();
+void SendNotModifiedStatus();
 void ProcessFileOrDirectoryRequest();
 void CloseConnectionToClient();
 bool CheckConnectionIsStillOpenByClient();
@@ -46,5 +47,6 @@ void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detail
 bool SendLineToClient(char* line);
 bool SendCrlfTerminatedLineToClient(char* line);
 void SendContentLengthHeader(ulong length);
+void SendLastModified();
 bool ProcessRequestedResource(bool is_local_redirect);
 void ProcessFileOrDirectoryRequest();

@@ -32,6 +32,8 @@ bool request_is_head;
 char raw_request[256+1];
 long input_content_length;
 bool input_content_length_received;
+dateTime fib_date;
+dateTime if_modified_since_date;
 
 static byte* data_buffer_pointer;
 static int data_buffer_length;
@@ -42,8 +44,6 @@ static bool base_directory_is_root_of_drive;
 static fileInfoBlock dir_list_fib;
 static bool send_as_attachment;
 static bool has_if_modified_since;
-static dateTime fib_date;
-static dateTime if_modified_since_date;
 static byte base_directory_length;
 static byte requested_resource[MAX_FILE_PATH_LEN+1];
 static int requested_resource_length;
@@ -113,7 +113,6 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
 static char* ConvertRequestToFilename(char** query_string_start, char** resource_start, bool is_local_redirect);
 static void StartSendingFile();
 static bool CheckIfModifiedSince();
-static void SendLastModified();
 static void ContinueSendingFile();
 static void StartSendingDirectory();
 static void ContinueSendingDirectoryHeaders();
@@ -382,7 +381,7 @@ bool ProcessRequestedResource(bool is_local_redirect)
     if(converted_filename)
     {
         is_cgi_file = StringStartsWith(resource_name_start, "CGI-BIN\\");
-        can_run_cgi = !is_local_redirect && state.cgiEnabled;
+        can_run_cgi = state.cgiEnabled;
         if(!(is_cgi_file && !can_run_cgi))
         {
             must_run_cgi = can_run_cgi && is_cgi_file;
@@ -576,6 +575,7 @@ static void SendHtmlResponseToClient(int statusCode, char* statusMessage, char* 
     SendResponseStart(statusCode, statusMessage);
     if(statusCode > 300 && statusCode < 400)
     {
+        SendContentLengthHeader(0);
         SendLineToClient(empty_str);
         return;
     }
@@ -723,6 +723,12 @@ void SendMethodNotAllowedError(bool fromCgi)
 }
 
 
+void SendNotModifiedStatus()
+{
+    SendErrorResponseToClient(304, "Not Modified", null);
+}
+
+
 void SendInternalError()
 {
     SendErrorResponseToClient(500, "Internal Server Error", "Sorry, something went wrong. It's not you, it's me.");
@@ -853,7 +859,7 @@ static bool CheckIfModifiedSince()
 
         if(has_if_modified_since && CompareDates(&fib_date, &if_modified_since_date) <= 0)
         {
-            SendErrorResponseToClient(304, "Not Modified", null);
+            SendNotModifiedStatus();
             CloseConnectionToClient();
             return true;
         }
@@ -863,9 +869,9 @@ static bool CheckIfModifiedSince()
 }
 
 
-static void SendLastModified()
+void SendLastModified()
 {
-    if(file_fib.dateOfModification != 0)
+    if(fib_date.year != 0)
     {
         //Note that we assume that fib_date has been already filled
         ToVerboseDate(buffer2, &fib_date);

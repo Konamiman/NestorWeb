@@ -31,6 +31,8 @@ extern long input_content_length;
 extern bool input_content_length_received;
 extern bool request_is_get;
 extern bool request_is_head;
+extern dateTime fib_date;
+extern dateTime if_modified_since_date;
 
 static byte error_code_from_cgi;
 static char* cgi_header_pointer;
@@ -332,6 +334,9 @@ void StartSendingCgiResult()
             case 3:
                 SendMethodNotAllowedError(true);
                 break;
+            case 4:
+                SendNotModifiedStatus();
+                break;
             default:
                 SendInternalError();
         }
@@ -515,10 +520,22 @@ static bool ProcessFirstHeaderOfCgiResult()
             return false;
         }
 
+        ParseFibDateTime(&file_fib, &fib_date);
+
+        if(GetEnvironmentItem("HTTP_IF_MODIFIED_SINCE", data_buffer) && 
+           ParseVerboseDateTime(data_buffer, &if_modified_since_date) &&
+           CompareDates(&fib_date, &if_modified_since_date) <= 0)
+        {
+            SendNotModifiedStatus();
+            CloseConnectionToClient();
+            return;
+        }
+
         if(!GetOutputHeaderLine())
             return false;
 
         must_send_cgi_contents_file = true;
+
     }
 
     return true;
@@ -572,6 +589,7 @@ void ContinueSendingCgiResultHeaders()
         }
 
         SendContentLengthHeader(file_fib.fileSize);
+        SendLastModified();
         SendLineToClient(empty_str);
 
         output_data_length = 0;
