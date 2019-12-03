@@ -1,6 +1,9 @@
 ;Example of NestorHTTP SCGI script that returns a response body from a content file.
 ;The file for this example is to be located at <base directory>\cgi-bin\contentf\datafile.dat
 
+CR: equ 13
+LF: equ 10
+
 STDOUT: equ 1
 _WRITE: equ 49h
 
@@ -14,7 +17,7 @@ _WRITE: equ 49h
     ret
 
 HEADERS:
-    db "X-CGI-Content-File: contentf\\datafile.dat",13,10
-    db 13,10
+    db "X-CGI-Content-File: contentf\\datafile.dat",CR,LF
+    db CR,LF
     ;Note: response body is ignored (the file contents is sent instead)
 HEADER_END:

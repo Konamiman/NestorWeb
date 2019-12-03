@@ -1,6 +1,9 @@
 ;Example of NestorHTTP CGI script that performs a local redirect.
 ;The server will respond as if the request had been "GET /foo/bar.txt"
 
+CR: equ 13
+LF: equ 10
+
 STDOUT: equ 1
 _WRITE: equ 49h
 
@@ -15,7 +18,7 @@ _WRITE: equ 49h
     ret
 
 REDIR:
-    db "Location: /foo/bar.txt",13,10
+    db "Location: /foo/bar.txt",CR,LF
     ;Note: additional headers and request body will be ignored
-    db 13,10
+    db CR,LF
 REDIR_END:

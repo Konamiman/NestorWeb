@@ -1,5 +1,8 @@
 ;Example of a NestorHTTP CGI script that sends a custom status code and message.
 
+CR: equ 13
+LF: equ 10
+
 STDOUT: equ 1
 _WRITE: equ 49h
 
@@ -14,8 +17,8 @@ _WRITE: equ 49h
     ret
 
 HELLO:
-    db "Status: 234 It's all okay",13,10
-    db 13,10
+    db "Status: 234 It's all okay",CR,LF
+    db CR,LF
     db "Hello, world!!"
 HELLO_END:
 

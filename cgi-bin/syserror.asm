@@ -1,6 +1,9 @@
 ;Example of NestorHTTP CGI script that retuns an error message
 ;using the system-defined markup.
 
+CR: equ 13
+LF: equ 10
+
 STDOUT: equ 1
 _WRITE: equ 49h
 
@@ -15,8 +18,8 @@ _WRITE: equ 49h
     ret
 
 ERROR:
-    db "X-CGI-Error: 434 Bad Foobar",13,10
+    db "X-CGI-Error: 434 Bad Foobar",CR,LF
     ;Note: no additional headers allowed here.
-    db 13,10
+    db CR,LF
     db "This <b>foobar</b> isn't <i>fizzbuzzed</i> enough."
 ERROR_END

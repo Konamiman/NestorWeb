@@ -1,6 +1,9 @@
 ;Example of NestorHTTP CGI script that performs a client redirect.
 ;The client will receive a "302 Found" status.
 
+CR: equ 13
+LF: equ 10
+
 STDOUT: equ 1
 _WRITE: equ 49h
 
@@ -15,7 +18,7 @@ _WRITE: equ 49h
     ret
 
 REDIR:
-    db "Location: http://www.konamiman.com",13,10
-    db 13,10
+    db "Location: http://www.konamiman.com",CR,LF
+    db CR,LF
     ;Note: request body will be ignored
 REDIR_END:

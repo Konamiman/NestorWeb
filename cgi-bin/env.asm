@@ -119,16 +119,16 @@ ADVANCE_TO_ZERO:
 NAME_END: dw 0
 
 ENV_TITLE:
-    db "Environment items:",13,10,13,10
+    db "Environment items:",CR,LF,CR,LF
 ENV_TITLE_END:
 
 BODY_TITLE:
-    db 13,10,"Request body:",13,10,13,10
+    db CR,LF,"Request body:",CR,LF,CR,LF
 BODY_TITLE_END:
 
 HEADERS:
-    db "Content-Type: text/plain",13,10
-    db 13,10
-    db "Environment items:",13,10
-    db 13,10
+    db "Content-Type: text/plain",CR,LF
+    db CR,LF
+    db "Environment items:",CR,LF
+    db CR,LF
 BUFFER:

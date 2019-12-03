@@ -528,7 +528,7 @@ static bool ProcessFirstHeaderOfCgiResult()
         {
             SendNotModifiedStatus();
             CloseConnectionToClient();
-            return;
+            return false;
         }
 
         if(!GetOutputHeaderLine())
@@ -625,6 +625,8 @@ static bool GetOutputHeaderLine()
     //without finding a proper end of line
     if(output_data_length == 0)
     {
+        RestoreStdinFileHandle();
+        RestoreStdoutFileHandle();
         PrintUnlessSilent("*** Malformed data received from CGI script: no headers end mark\r\n");
         SendInternalError();
         CloseConnectionToClient();

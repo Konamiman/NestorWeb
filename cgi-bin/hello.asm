@@ -1,6 +1,9 @@
 ;Hello world - NestorHTTP CGI version.
 ;Includes a custom response header.
 
+CR: equ 13
+LF: equ 10
+
 STDOUT: equ 1
 _WRITE: equ 49h
 
@@ -15,8 +18,8 @@ _WRITE: equ 49h
     ret
 
 HELLO:
-    db "Content-Type: text/plain",13,10
-    db "X-Custom-Header: Foobar",13,10
-    db 13,10
+    db "Content-Type: text/plain",CR,LF
+    db "X-Custom-Header: Foobar",CR,LF
+    db CR,LF
     db "Hello, world!!"
 HELLO_END:

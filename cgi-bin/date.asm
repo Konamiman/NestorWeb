@@ -2,6 +2,9 @@
 ;This one uses _CONOUT and _STROUT to write the request body to STDOUT,
 ;but using _WRITE instead is generally recommended.
 
+CR: equ 13
+LF: equ 10
+
 _CONOUT: equ 2
 _STROUT: equ 9
 _GDATE: equ 2Ah
@@ -137,6 +140,6 @@ Num2:	inc	a
 	ret 
 
 HEADERS:
-    db "Content-Type: text/plain",13,10
-    db 13,10
+    db "Content-Type: text/plain",CR,LF
+    db CR,LF
     db "$"
