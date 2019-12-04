@@ -115,8 +115,16 @@ void InitializeCgiEngine()
 }
 
 
-static void RestoreStdoutFileHandle()
+void RestoreStandardFileHandles()
 {
+    if(state.stdinFileHandleCopy != 0xFF)
+    {
+        CloseFile(STDIN);
+        DuplicateFileHandle(state.stdinFileHandleCopy, null);
+        CloseFile(state.stdinFileHandleCopy);
+        state.stdinFileHandleCopy = 0xFF;
+    }
+
     if(state.stdoutFileHandleCopy != 0xFF)
     {
         CloseFile(STDOUT);
@@ -127,23 +135,10 @@ static void RestoreStdoutFileHandle()
 }
 
 
-void RestoreStdinFileHandle()
-{
-    if(state.stdinFileHandleCopy != 0xFF)
-    {
-        CloseFile(STDIN);
-        DuplicateFileHandle(state.stdinFileHandleCopy, null);
-        CloseFile(state.stdinFileHandleCopy);
-        state.stdinFileHandleCopy = 0xFF;
-    }
-}
-
-
 void ReinitializeCgiEngine(byte errorCodeFromCgi)
 {
     CreateTempFilePaths();
-    RestoreStdoutFileHandle();
-    RestoreStdinFileHandle();
+    RestoreStandardFileHandles();
     InitializeDataBuffers();
     DisableDiskErrorPrompt();
 
@@ -206,7 +201,7 @@ void RunCgi()
 
     //If we get here there was an error while attempting to fork
 
-    RestoreStdoutFileHandle();
+    RestoreStandardFileHandles();
     if(state.verbosityLevel > VERBOSE_MODE_SILENT)
         printf("*** Error running CGI script: %i\r\n", error);
 
@@ -625,8 +620,7 @@ static bool GetOutputHeaderLine()
     //without finding a proper end of line
     if(output_data_length == 0)
     {
-        RestoreStdinFileHandle();
-        RestoreStdoutFileHandle();
+        RestoreStandardFileHandles();
         PrintUnlessSilent("*** Malformed data received from CGI script: no headers end mark\r\n");
         SendInternalError();
         CloseConnectionToClient();

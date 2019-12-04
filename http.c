@@ -280,7 +280,7 @@ void CloseConnectionToClient()
 
     has_if_modified_since = false;
 
-    RestoreStdinFileHandle();
+    RestoreStandardFileHandles();
 }
 
 

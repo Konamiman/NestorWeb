@@ -4,7 +4,7 @@
 #include "types.h"
 
 void InitializeCgiEngine();
-void RestoreStdinFileHandle();
+void RestoreStandardFileHandles();
 void ReinitializeCgiEngine(byte errorCodeFromCgi);
 void RunCgi();
 void SendResultAfterCgi();
