@@ -74,6 +74,7 @@ static const char* env_path_translated = "PATH_TRANSLATED";
 static const char* env_remote_addr = "REMOTE_ADDR";
 static const char* env_content_type = "CONTENT_TYPE";
 static const char* env_content_length = "CONTENT_LENGTH";
+static const char* env_base_directory = "_NHTTP_BASE_DIR";
 
 
 static void CreateTempFilePaths()
@@ -102,6 +103,8 @@ static void InitializeFixedEnvItems()
     SetEnvironmentItem(env_server_port, data_buffer);
 
     SetEnvironmentItem(env_server_software, "NestorHTTP/" VERSION);
+
+    SetEnvironmentItem(env_base_directory, state.baseDirectory);
 }
 
 
@@ -306,6 +309,8 @@ void CleanupCgiEngine()
     DeleteEnvironmentItem(env_server_protocol);
     DeleteEnvironmentItem(env_path_translated);
     DeleteEnvironmentItem(env_remote_addr);
+
+    DeleteEnvironmentItem(env_base_directory);
 
     CleanupHeaderBasedEnvItems();
 }
