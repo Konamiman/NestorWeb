@@ -7,23 +7,17 @@
 static const char* week_days[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 static const char* months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-bool strncmpi(const char *s1, const char *s2, int len) {
+bool StringStartsWith(const char *string, const char *prefix) {
     char c1;
     char c2;
-
-    while(len--)
+    
+    while(c2 = *prefix++)
     {
-        c1 = ToLower(*s1++);
-        c2 = ToLower(*s2++);
-
-        if(c1 == 0 && c2 == 0)
-            return true;
-        
-        if(c1 != c2)
+        if(ToLower(c2) != ToLower(*string++))
             return false;
     }
 
-    return c1 == c2;
+    return true;
 }
 
 
@@ -83,6 +77,12 @@ void ParseFibDateTime(fileInfoBlock* fib, dateTime* date_time)
      Bits  4...0 - SECONDS/2 (0..29)
     */
 
+    if(fib->dateOfModification == 0)
+    {
+        date_time->year = 0;
+        return;
+    }
+
     date_time->year = ((fib->dateOfModification >> 9) & 0x7F) + 1980;
     date_time->month = (fib->dateOfModification >> 5) & 0xF;
     date_time->day = fib->dateOfModification & 0x1F;
@@ -109,7 +109,7 @@ bool ParseVerboseDateTime(char* string, dateTime* date_time)
     temp = 0;
     while(true)
     {
-        if(strncmpi(&string[8], months[temp], 3))
+        if(StringStartsWith(&string[8], months[temp]))
         {
             date_time->month = temp+1;
             break;
@@ -159,4 +159,45 @@ int CompareDates(dateTime* dt1, dateTime* dt2)
         return dt1->minute - dt2->minute;
 
     return dt1->second - dt2->second;
+}
+
+
+static char isxdigit(unsigned char c)
+{
+    return ( c >= '0' && c <= '9') ||
+         ( c >= 'a' && c <= 'f') ||
+         ( c >= 'A' && c <= 'F');
+}
+
+
+//https://stackoverflow.com/a/20437049/4574
+void UrlDecode(char *sSource, char *sDest, bool plusIsSpace) 
+{
+    int nLength;
+    char ch;
+
+    for (nLength = 0; *sSource; nLength++) {
+        if ((ch = *sSource) == '+' && plusIsSpace)
+        {
+            sDest[nLength] = ' ';
+            sSource++;
+            continue;
+        }
+        if (ch == '%' && sSource[1] && sSource[2] && isxdigit(sSource[1]) && isxdigit(sSource[2])) {
+            sSource[1] -= sSource[1] <= '9' ? '0' : (sSource[1] <= 'F' ? 'A' : 'a')-10;
+            sSource[2] -= sSource[2] <= '9' ? '0' : (sSource[2] <= 'F' ? 'A' : 'a')-10;
+            sDest[nLength] = 16 * sSource[1] + sSource[2];
+            sSource += 3;
+            continue;
+        }
+        sDest[nLength] = ch;
+        sSource++;
+    }
+    sDest[nLength] = '\0';
+}
+
+
+void FormatIpAddress(char* dst, byte* address_bytes)
+{
+    sprintf(dst, "%i.%i.%i.%i", address_bytes[0], address_bytes[1], address_bytes[2], address_bytes[3]);
 }

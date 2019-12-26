@@ -195,8 +195,14 @@
 #define MIN_DISK_ERROR_CODE 0xF0
 
 // File attributes
-
 #define FILE_ATTR_DIRECTORY (1 << 4)
+
+//Open file flags
+#define FILE_OPEN_NO_WRITE (1 << 0)
+#define FILE_OPEN_NO_READ (1 << 1)
+#define FILE_OPEN_INHERITABLE (1 << 2)
+
+#define MAX_COMMAND_LINE_LENGTH 127
 
 // Data structures
 

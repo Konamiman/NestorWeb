@@ -1,9 +1,9 @@
-# crt0msx_msxdos_advanced.rel, printf_simple.rel, putchar_msxdos.rel, asm.lib/.h
+# crt0msx_msxdos2_fork.rel, printf_simple.rel, putchar_msxdos.rel, asm.lib/.h
 # are available at konamiman.com
 ALLOCS = 1000 # Higher value = smaller generated file but slower compilation. Recommended for release: 100000
 COMMON_FLAGS = -mz80 --disable-warning 196 --disable-warning 85 --max-allocs-per-node $(ALLOCS) --allow-unsafe-read --opt-code-size
-PROGRAM_FLAGS = --code-loc 0x180 --data-loc 0 --no-std-crt0
-LIBS = crt0msx_msxdos_advanced.rel printf_simple.rel putchar_msxdos.rel asm.lib
+PROGRAM_FLAGS = --code-loc 0x410 --data-loc 0 --no-std-crt0
+LIBS = crt0msx_msxdos2_fork.rel printf_simple.rel putchar_msxdos.rel asm.lib
 
 ifeq ($(OS),Windows_NT)
 	RM = del
@@ -11,18 +11,21 @@ endif
 
 all: nhttp.com
 
-nhttp.com: nhttp.c system.rel tcpip.rel http.rel utils.rel version.h tcpip.h
-	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nhttp.ihx $(LIBS) system.rel tcpip.rel http.rel utils.rel nhttp.c
+nhttp.com: nhttp.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h
+	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nhttp.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel nhttp.c
 	hex2bin -e com nhttp.ihx
 
 system.rel: system.c system.h msxdos.h
 	sdcc -c $(COMMON_FLAGS) system.c
 
-tcpip.rel: tcpip.c tcpip.h
+tcpip.rel: tcpip.c tcpip.h buffers.h
 	sdcc -c $(COMMON_FLAGS) tcpip.c
 
-http.rel: http.c http.h version.h
+http.rel: http.c http.h version.h msxdos.h buffers.h
 	sdcc -c $(COMMON_FLAGS) http.c
+
+cgi.rel: cgi.c cgi.h version.h msxdos.h buffers.h
+	sdcc -c $(COMMON_FLAGS) cgi.c
 
 utils.rel: utils.c utils.h
 	sdcc -c $(COMMON_FLAGS) utils.c
@@ -39,4 +42,5 @@ clean:
 	$(RM) system.rel
 	$(RM) tcpip.rel
 	$(RM) http.rel
+	$(RM) cgi.rel
 	$(RM) utils.rel

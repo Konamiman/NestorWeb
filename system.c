@@ -6,7 +6,7 @@
 #include "stdio.h"
 
 
-static Z80_registers regs;
+extern Z80_registers regs;
 static fileInfoBlock fib;
 
 
@@ -106,12 +106,13 @@ byte SearchNextFile(fileInfoBlock* fib)
 }
 
 
-byte OpenFile(void* path_or_fib, byte* file_handle)
+byte OpenOrCreateFile(byte function_call, void* path_or_fib, byte* file_handle, byte flags)
 {
     regs.Words.DE = (int)path_or_fib;
-    regs.Bytes.A = 0;
-    DosCall(F_OPEN, &regs, REGS_MAIN, REGS_MAIN);
-    if(regs.Bytes.A == 0)
+    regs.Bytes.A = flags;
+    regs.Bytes.B = 0;
+    DosCall(function_call, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A == 0 && file_handle != null)
         *file_handle = regs.Bytes.B;
     
     return regs.Bytes.A;
@@ -129,10 +130,20 @@ byte ReadFromFile(byte file_handle, byte* destination, int* length)
 }
 
 
+byte WriteToFile(byte file_handle, byte* source, int length)
+{
+    regs.Bytes.B = file_handle;
+    regs.Words.DE = (int)source;
+    regs.Words.HL = length;
+    DosCall(F_WRITE, &regs, REGS_MAIN, REGS_AF);
+    return regs.Bytes.A;
+}
+
+
 void CloseFile(byte file_handle)
 {
     regs.Bytes.B = file_handle;
-    DosCall(F_READ, &regs, REGS_MAIN, REGS_NONE);
+    DosCall(F_CLOSE, &regs, REGS_MAIN, REGS_NONE);
 }
 
 
@@ -161,8 +172,14 @@ DSKERR_CODE:
 ABORT_CODE:
     ld c,a
     cp #ERR_ABORT
+    jr z,ABORT_CODE2
+    cp #ERR_INERR
+    jr z,ABORT_CODE2
+    cp #ERR_OUTERR
+    jr z,ABORT_CODE2
     ld a,c
-    ret nz ;Not a disk error abort -> the program is willingfully terminating
+    ret     ;Not a disk error abort -> the program is willingfully terminating
+ABORT_CODE2:
 
     ;This causes execution to return to the caller of the DOS function call,
     ;instead of continuing to the termination of the program
@@ -192,6 +209,12 @@ void HideFunctionKeys()
 }
 
 
+void InitializeFunctionKeysContents()
+{
+    BiosCall(INIFNK, &regs, REGS_NONE);
+}
+
+
 void SetFunctionKeyContents(int key, char* contents)
 {
     memset(F_KEY_CONTENTS_POINTER(key), (int)' ', F_KEY_CONTENTS_LENGTH);
@@ -199,3 +222,80 @@ void SetFunctionKeyContents(int key, char* contents)
 	    strcpy(F_KEY_CONTENTS_POINTER(key), contents);
 }
 
+
+bool GetEnvironmentItem(const char* name, char* value)
+{
+    regs.Words.HL = (int)name;
+    regs.Words.DE = (int)value;
+    regs.Bytes.B = 255;
+    DosCall(F_GENV, &regs, REGS_MAIN, REGS_NONE);
+    return *value != '\0';
+}
+
+
+byte SetEnvironmentItem(const char* name, const char* value)
+{
+    regs.Words.HL = (int)name;
+    regs.Words.DE = (int)value;
+    DosCall(F_SENV, &regs, REGS_MAIN, REGS_AF);
+    return regs.Bytes.A;
+}
+
+
+bool FindEnvironmentItem(uint index, char* name)
+{
+    regs.UWords.DE = index;
+    regs.Words.HL = (int)name;
+    regs.Bytes.B = 255;
+    DosCall(F_FENV, &regs, REGS_MAIN, REGS_NONE);
+    return *name != '\0';
+}
+
+
+char* GetPointerToLastItemOfPathname(const char* pathname)
+{
+    regs.Bytes.B = 0;
+    regs.Words.DE = (int)pathname;
+    DosCall(F_PARSE, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A != 0)
+        return null;
+    
+    return (char*)regs.Words.HL;
+}
+
+
+byte DuplicateFileHandle(byte fileHandle, byte* duplicatedFileHandle)
+{
+    regs.Bytes.B = fileHandle;
+    DosCall(F_DUP, &regs, REGS_MAIN, REGS_MAIN);
+    if(regs.Bytes.A == 0 && duplicatedFileHandle)
+        *duplicatedFileHandle = regs.Bytes.B;
+    return regs.Bytes.A;
+}
+
+
+byte DeleteFile(char* path)
+{
+    regs.Words.DE = (int)path;
+    DosCall(F_DELETE, &regs, REGS_MAIN, REGS_AF);
+    return regs.Bytes.A;
+}
+
+
+byte ParseFilename(const char* fileName, char* expandedFilename)
+{
+    regs.Words.DE = (int)fileName;
+    regs.Words.HL = (int)expandedFilename;
+    DosCall(F_PFILE, &regs, REGS_MAIN, REGS_AF);
+    return regs.Bytes.A;
+}
+
+
+void RewindFile(byte fileHandle)
+{
+    regs.Bytes.B = fileHandle;
+    regs.Bytes.A = 0; //Relative to beginning of file_handle
+    regs.Words.DE = 0;
+    regs.Words.HL = 0;
+    DosCall(F_SEEK, &regs, REGS_MAIN, REGS_NONE);
+}
