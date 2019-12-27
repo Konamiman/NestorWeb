@@ -9,6 +9,7 @@
 #include "version.h"
 #include "proc.h"
 #include "cgi.h"
+#include "auth.h"
 
 const char* empty_str = "";
 
@@ -19,7 +20,7 @@ const char* strTitle =
 
 const char* strHelp =
     "Usage: NHTTP <base directory> [p=<port>] [v=0|1|2] [t=<timeout>]\r\n"
-    "             [d=0|1] [c=0|1]\r\n"
+    "             [d=0|1] [c=0|1] [a=0|1|2]\r\n"
     "\r\n"
     "p: Server port number, 1-" MAX_USABLE_TCP_PORT_STR ", default is 80\r\n"
     "v: Verbosity mode:\r\n"
@@ -27,9 +28,13 @@ const char* strHelp =
     "t: Inactivity timeout for client connections in seconds, default is " DEFAULT_INACTIVITY_TIMEOUT_SECS_STR "\r\n"
     "d: enable directory listing when 1 (default: disabled)\r\n"
     "d: enable CGI scripts when 1 (default: enabled)\r\n"
+    "a: authentication mode: 0=none (default), 1=static content, 2=static and CGI\r\n"
     "\r\n"
     "When directory listing is disabled, a request for \"/\" or for a directory will\r\n"
     "serve INDEX.HTM file if it exists, or return a Not Found status if it doesn't.\r\n"
+    "\r\n"
+    "When authentication mode is 1 or 2, NHTTP_USER and NHTTP_PASSWORD environment\r\n"
+    "items must be set.\r\n"
     "\r\n"
     "Files are sent as attachments if \"?a=1\" is added to the request.\r\n"
     "\r\n";
@@ -110,6 +115,7 @@ void ProcessArguments(char** argv, int argc)
     state.inactivityTimeout = DEFAULT_INACTIVITY_TIMEOUT_SECS;
     state.directoryListingEnabled = false;
     state.cgiEnabled = true;
+    state.authenticationMode = AUTH_MODE_NONE;
 
     for(i = 1; i<argc; i++)
     {
@@ -138,6 +144,10 @@ void ProcessArguments(char** argv, int argc)
         {
             state.cgiEnabled = ((byte)argv[i][2]-'0') != 0;
         }
+        else if(c == 'a')
+        {
+            state.authenticationMode = ((byte)argv[i][2]-'0');
+        }
         else
         {
             TerminateWithErrorMessage("Unknown parameter");
@@ -150,6 +160,8 @@ void ProcessArguments(char** argv, int argc)
 
 void Initialize()
 {
+    char* auth_error;
+
     CHECK(MsxDos2IsRunning, "MSX-DOS 2 required");
 
     CHECK(TcpIpUnapiIsAvailable, "No TCP/IP UNAPI implementations found");
@@ -169,7 +181,11 @@ void Initialize()
             TerminateWithErrorMessage("Invalid temporary directory (in NHTTP_TEMP or TEMP environment item): too long");
 
         InitializeCgiEngine();
-    }        
+    }
+
+    auth_error = InitializeAuthentication();
+    if(*auth_error)
+        TerminateWithErrorMessage(auth_error);
 
     DisableDiskErrorPrompt();
     AbortAllTransientTcpConnections();
@@ -179,6 +195,7 @@ void Initialize()
     printf("CGI support is %s\r\n", state.cgiEnabled ? "ON" : "OFF");
     if(state.cgiEnabled)
         printf("Temporary directory for CGI: %s\r\n", temp_directory);
+    printf("Authentication mode: %s\r\n", AuthModeAsString());
     printf("Listening on %i.%i.%i.%i:%u\r\n", state.localIp[0], state.localIp[1], state.localIp[2], state.localIp[3], state.tcpPort);
     printf("Press any key to exit\r\n\r\n");
 
@@ -229,6 +246,7 @@ byte proc_join(byte error_code_from_subprocess, void* state_data)
     ReinitializeHttpAutomaton();
     GetEnvironmentItem(temp_directory_backup_env_item, temp_directory);
     ReinitializeCgiEngine(error_code_from_subprocess);
+    InitializeAuthentication();
     return ServerMainLoop();
 }
 
