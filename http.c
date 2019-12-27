@@ -11,14 +11,16 @@
 #include "buffers.h"
 #include "system.h"
 #include <string.h>
+#include "auth.h"
 
 #define MAX_CACHE_SECS_FOR_DIRECTORY_LISTING "3600"
 
 extern applicationState state;
-extern char http_error_buffer[80];
+extern char http_error_buffer[];
 extern fileInfoBlock file_fib;
-extern byte buffer[64];
-extern byte buffer2[64];
+extern byte buffer[];
+extern byte buffer2[];
+extern byte auth_header[];
 
 byte* output_data_buffer;
 byte* output_data_pointer;
@@ -134,6 +136,7 @@ static void InitializeDataBuffer()
     data_buffer_pointer = data_buffer; 
     data_buffer_length = 0;
     skipping_data = false;
+    *auth_header = '\0';
     ResetInactivityCounter();
 }
 
@@ -378,6 +381,8 @@ bool ProcessRequestedResource(bool is_local_redirect)
     converted_filename = ConvertRequestToFilename(&query_string, &resource_name_start, is_local_redirect);
     send_as_attachment = query_string && StringStartsWith(query_string, "a=1");
 
+    InitializeAuthenticationBuffers();
+
     if(converted_filename)
     {
         is_cgi_file = StringStartsWith(resource_name_start, "CGI-BIN\\");
@@ -521,6 +526,9 @@ static void ContinueReadingHeaders()
 
 static void ProcessHeader()
 {
+    if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
+        printf("<-- %s\r\n", data_buffer);
+
     if(must_run_cgi)
         ProcessHeaderForCgi();
     else
@@ -532,12 +540,13 @@ static void ProcessHeader()
 
 static void ProcessHeaderForStaticContent()
 {
-    if(state.verbosityLevel > VERBOSE_MODE_CONNECTIONS)
-        printf("<-- %s\r\n", data_buffer);
-
     if(StringStartsWith(data_buffer, "If-Modified-Since:"))
     {
         has_if_modified_since = ParseVerboseDateTime(&data_buffer[18], &if_modified_since_date);
+    }
+    else
+    {
+        ProcessAuthenticationHeader(false);
     }
 }
 
@@ -739,7 +748,13 @@ void ProcessFileOrDirectoryRequest()
 {
     byte error;
     bool is_directory;
+    bool is_cgi;
     dateTime date_time;
+
+    is_cgi = must_run_cgi && !(state.directoryListingEnabled && send_as_attachment);
+
+    if(!ProcessAuthentication(is_cgi))
+        return;
 
     //We need to treat requesting the root resource + the base directory being the root of the drive
     //as a special case, since in this case we can't search for the directory itself
@@ -792,7 +807,7 @@ void ProcessFileOrDirectoryRequest()
 
     if(is_directory)
         StartSendingDirectory();
-    else if(must_run_cgi && !(state.directoryListingEnabled && send_as_attachment))
+    else if(is_cgi)
         RunCgi();
     else
         StartSendingFile();
