@@ -21,10 +21,16 @@ extern byte data_buffer[];
 extern const char* env_remote_user;
 extern const char* env_remote_password;
 
+const char* auth_mode_backup_env_item = "_NHTTP_AUTH_MODE";
+
 char* InitializeAuthentication()
 {
     if(state.authenticationMode > AUTH_MODE_STATIC_AND_CGI)
         return "Unknown authentication mode";
+
+    current_user[0] = state.authenticationMode + '0';
+    current_user[1] = '\0';
+    SetEnvironmentItem(auth_mode_backup_env_item, current_user);
 
     if(state.authenticationMode == AUTH_MODE_NONE)
         return empty_str;
@@ -39,6 +45,12 @@ char* InitializeAuthentication()
         strcpy(auth_realm, "NestorHTTP");
 
     return empty_str;
+}
+
+
+void CleanupAuthentication()
+{
+    DeleteEnvironmentItem(auth_mode_backup_env_item);
 }
 
 

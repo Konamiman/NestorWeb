@@ -6,6 +6,7 @@
 #define AUTH_MODE_STATIC_AND_CGI 2
 
 char* InitializeAuthentication();
+void CleanupAuthentication();
 char* AuthModeAsString();
 void SendUnauthorizedError();
 void InitializeAuthenticationBuffers();

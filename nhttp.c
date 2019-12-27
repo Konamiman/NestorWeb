@@ -185,7 +185,10 @@ void Initialize()
 
     auth_error = InitializeAuthentication();
     if(*auth_error)
+    {
+        CleanupAuthentication();
         TerminateWithErrorMessage(auth_error);
+    }
 
     DisableDiskErrorPrompt();
     AbortAllTransientTcpConnections();
@@ -232,6 +235,7 @@ void Cleanup()
 {
     CleanupHttpAutomaton();
     CleanupCgiEngine();
+    CleanupAuthentication();
     DeleteEnvironmentItem(temp_directory_backup_env_item);
 
     HideFunctionKeys();
