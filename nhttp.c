@@ -248,9 +248,9 @@ byte proc_join(byte error_code_from_subprocess, void* state_data)
     memcpy(&state, state_data, sizeof(applicationState));
     ReinitializeTcpIpUnapi();
     ReinitializeHttpAutomaton();
+    InitializeAuthentication();
     GetEnvironmentItem(temp_directory_backup_env_item, temp_directory);
     ReinitializeCgiEngine(error_code_from_subprocess);
-    InitializeAuthentication();
     return ServerMainLoop();
 }
 

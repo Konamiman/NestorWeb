@@ -8,12 +8,12 @@
 #include "utils.h"
 #include "base64.h"
 
-byte auth_user[255+1];
-byte auth_password[255+1];
-byte auth_realm[255+1];
-byte auth_header[256+1];
-char current_user[255+1];
-char current_password[255+1];
+static byte auth_user[255+1];
+static byte auth_password[255+1];
+static byte auth_realm[255+1];
+byte auth_header[255+1];
+static char current_user[255+1];
+static char current_password[255+1];
 
 extern applicationState state;
 extern const char* empty_str;
@@ -32,17 +32,17 @@ char* InitializeAuthentication()
     current_user[1] = '\0';
     SetEnvironmentItem(auth_mode_backup_env_item, current_user);
 
+    GetEnvironmentItem("NHTTP_REALM", auth_realm);
+    if(*auth_realm == '\0')
+        strcpy(auth_realm, "NestorHTTP");
+
     if(state.authenticationMode == AUTH_MODE_NONE)
         return empty_str;
-    
+
     GetEnvironmentItem("NHTTP_USER", auth_user);
     GetEnvironmentItem("NHTTP_PASSWORD", auth_password);
     if(*auth_user == '\0' || *auth_password == '\0')
         return "NHTTP_USER and NHTTP_PASSWORD environment items are required when using authentication.";
-
-    GetEnvironmentItem("NHTTP_REALM", auth_realm);
-    if(*auth_realm == '\0')
-        strcpy(auth_realm, "NestorHTTP");
 
     return empty_str;
 }
@@ -83,7 +83,7 @@ void SendUnauthorizedError()
 {
     SendResponseStart(401, "Unauthorized");
     SendContentLengthHeader(0);
-    sprintf(OUTPUT_DATA_BUFFER_START, "WWW-Authenticate: Basic realm=\"%s\"\r\n", auth_realm);
+    sprintf(OUTPUT_DATA_BUFFER_START, "WWW-Authenticate: Basic realm=\"%s\"", auth_realm);
     SendLineToClient(OUTPUT_DATA_BUFFER_START);
     SendLineToClient(empty_str);
 }

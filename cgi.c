@@ -345,6 +345,12 @@ void StartSendingCgiResult()
             case 4:
                 SendNotModifiedStatus();
                 break;
+            case 5:
+                SendUnauthorizedError();
+                break;
+            case 6:
+                SendForbiddenError();
+                break;
             default:
                 SendInternalError();
         }
