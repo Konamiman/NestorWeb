@@ -800,7 +800,6 @@ void ProcessFileOrDirectoryRequest()
     }
     else if(error != 0)
     {
-        printf("--- 6\r\n");
         SendBadRequestError();
         CloseConnectionToClient();
         return;

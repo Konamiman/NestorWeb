@@ -226,7 +226,6 @@ bool CreateAndRedirectInFile()
     if(!input_content_length_received && !request_is_get && !request_is_head)
     {
         PrintUnlessSilent("*** Content-Length header not received\r\n");
-        printf("--- 1\r\n");
         SendBadRequestError();
         CloseConnectionToClient();
         return false;
@@ -335,7 +334,6 @@ void StartSendingCgiResult()
         switch(error_code_from_cgi)
         {
             case 1:
-                printf("--- 2\r\n");
                 SendBadRequestError();
                 break;
             case 2:
@@ -675,8 +673,6 @@ bool SetupRequestDependantEnvItems()
     byte slashes_count;
     char ch;
 
-    printf("--- %s\r\n", raw_request);
-
     pointer = raw_request;
     slashes_count = 0;
     
@@ -695,7 +691,6 @@ bool SetupRequestDependantEnvItems()
     {
         if(ch == '\0')
         {
-            printf("--- 3\r\n");
             SendBadRequestError();
             CloseConnectionToClient();
             return false;
@@ -722,7 +717,6 @@ bool SetupRequestDependantEnvItems()
         {
             if(ch == '\0')
             {
-                printf("--- 4\r\n");
                 SendBadRequestError();
                 CloseConnectionToClient();
                 return false;
@@ -755,7 +749,6 @@ bool SetupRequestDependantEnvItems()
         {
             if(ch == '\0')
             {
-                printf("--- 5\r\n");
                 SendBadRequestError();
                 CloseConnectionToClient();
                 return false;
