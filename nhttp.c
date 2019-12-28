@@ -14,12 +14,12 @@
 const char* empty_str = "";
 
 const char* strTitle = 
-    "NestorHTTP " VERSION " - the HTTP server for MSX\r\n"
+    "NestorWeb " VERSION " - the web server for MSX\r\n"
     "(c) 2020 by Konamiman\r\n"
     "\r\n";
 
 const char* strHelp =
-    "Usage: NHTTP <base directory> [p=<port>] [v=0|1|2] [t=<timeout>]\r\n"
+    "Usage: NWEB <base directory> [p=<port>] [v=0|1|2] [t=<timeout>]\r\n"
     "             [d=0|1] [c=0|1] [a=0|1|2]\r\n"
     "\r\n"
     "p: Server port number, 1-" MAX_USABLE_TCP_PORT_STR ", default is 80\r\n"
@@ -33,13 +33,13 @@ const char* strHelp =
     "When directory listing is disabled, a request for \"/\" or for a directory will\r\n"
     "serve INDEX.HTM file if it exists, or return a Not Found status if it doesn't.\r\n"
     "\r\n"
-    "When authentication mode is 1 or 2, NHTTP_USER and NHTTP_PASSWORD environment\r\n"
+    "When authentication mode is 1 or 2, NWEB_USER and NWEB_PASSWORD environment\r\n"
     "items must be set.\r\n"
     "\r\n"
     "Files are sent as attachments if \"?a=1\" is added to the request.\r\n"
     "\r\n";
 
-const char* temp_directory_backup_env_item = "_NHTTP_TEMP";
+const char* temp_directory_backup_env_item = "_NWEB_TEMP";
 
 applicationState state;
 Z80_registers regs;
@@ -175,10 +175,10 @@ void Initialize()
     if(state.cgiEnabled)
     {
         if(!GetTempDirectory())
-            TerminateWithErrorMessage("Invalid temporary directory (in NHTTP_TEMP or TEMP environment item)");
+            TerminateWithErrorMessage("Invalid temporary directory (in NWEB_TEMP or TEMP environment item)");
         
         if(strlen(temp_directory) > 64-11)
-            TerminateWithErrorMessage("Invalid temporary directory (in NHTTP_TEMP or TEMP environment item): too long");
+            TerminateWithErrorMessage("Invalid temporary directory (in NWEB_TEMP or TEMP environment item): too long");
 
         InitializeCgiEngine();
     }
@@ -260,7 +260,7 @@ bool GetTempDirectory()
     char* pointer_to_last_item;
     byte error;
 
-    if(!GetEnvironmentItem("NHTTP_TEMP", buffer))
+    if(!GetEnvironmentItem("NWEB_TEMP", buffer))
     {
         if(!GetEnvironmentItem("TEMP", buffer))
         {

@@ -1,4 +1,4 @@
-;Hello world - NestorHTTP CGI version.
+;Hello world - NestorWeb CGI version.
 ;Includes a custom response header.
 
 CR: equ 13

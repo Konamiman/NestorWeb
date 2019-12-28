@@ -1,5 +1,5 @@
 /*
-NestorHTTP CGI script that implements a guestbook
+NestorWeb CGI script that implements a guestbook
 
 - "GET /cgi-bin/guestbk.cgi" will display the form to enter name and message.
 - "POST /cgi-bin/guestbk.cgi" will append the message to a file named GUESTBK.TXT.
@@ -7,7 +7,7 @@ NestorHTTP CGI script that implements a guestbook
 - Name and message are mandatory, if any is missing then a "Bad Request" error is returned.
 
 The GUESTBK.TXT file will be created/searched for in the directory specified by the GUESTBK_DIR environment item
-(it must end with "\"), or if that item doesn't exist, in the NestorHTTP temporary directory.
+(it must end with "\"), or if that item doesn't exist, in the NestorWeb temporary directory.
 
 TODO:
 - Sanitize input (at least, verify lengths against maximums allowed)
@@ -15,7 +15,7 @@ TODO:
 
 Compile with:
 
-sdcc -mz80 --disable-warning 196 --disable-warning 85 -o nhttp.ihx --code-loc 0x110 --data-loc 0 --no-std-crt0
+sdcc -mz80 --disable-warning 196 --disable-warning 85 -o nweb.ihx --code-loc 0x110 --data-loc 0 --no-std-crt0
      crt0msx_msxdos.rel printf_simple.rel putchar_msxdos.rel asm.lib guestbk.c
 hex2bin -e com guestbk.c
 
@@ -66,9 +66,9 @@ typedef unsigned char bool;
 #define _TERM 0x62
 #define _GENV 0x6B
 
-#define NHTTP_ERR_BAD_REQUEST 1
-#define NHTTP_ERR_NOT_FOUND 2
-#define NHTTP_ERR_BAD_METHOD 3
+#define NWEB_ERR_BAD_REQUEST 1
+#define NWEB_ERR_NOT_FOUND 2
+#define NWEB_ERR_BAD_METHOD 3
 
 char buffer[256];
 char buffer2[256];
@@ -109,7 +109,7 @@ void main()
         else if(strcmpi(buffer, "POST"))
             ProcessFormData();
         else
-            Terminate(NHTTP_ERR_BAD_METHOD);
+            Terminate(NWEB_ERR_BAD_METHOD);
 
     }
     else if(strcmpi(buffer, "/thanks"))
@@ -118,11 +118,11 @@ void main()
         if(strcmpi(buffer, "GET"))
             SendThanks();
         else
-            Terminate(NHTTP_ERR_BAD_METHOD);
+            Terminate(NWEB_ERR_BAD_METHOD);
     }
     else
     {
-        Terminate(NHTTP_ERR_NOT_FOUND);
+        Terminate(NWEB_ERR_NOT_FOUND);
     }
 
     Terminate(0);
@@ -152,7 +152,7 @@ void ProcessFormData()
 
     GetEnvironmentItem("CONTENT_TYPE", buffer);
     if(!strcmpi(buffer, "application/x-www-form-urlencoded"))
-        Terminate(NHTTP_ERR_BAD_REQUEST);
+        Terminate(NWEB_ERR_BAD_REQUEST);
 
     //* Extract form data
 
@@ -170,7 +170,7 @@ void ProcessFormData()
         else if(strcmpi(extracted_key_pointer, "text"))
             text = extracted_value_pointer;
         else
-            Terminate(NHTTP_ERR_BAD_REQUEST);
+            Terminate(NWEB_ERR_BAD_REQUEST);
     }
 
     if(*name == '\0' || *text == '\0')
@@ -192,7 +192,7 @@ void ProcessFormData()
 
     GetEnvironmentItem("REMOTE_ADDR", IP_BUFFER);
     GetEnvironmentItem("GUESTBK_DIR", buffer);
-    if(*buffer == '\0') GetEnvironmentItem("_NHTTP_TEMP", buffer);
+    if(*buffer == '\0') GetEnvironmentItem("_NWEB_TEMP", buffer);
     strcat(buffer, "GUESTBK.TXT");
     file_handle = OpenFile(buffer);
     if(!file_handle) file_handle = CreateFile(buffer);
@@ -251,7 +251,7 @@ void SendThanks()
     sprintf(BIG_BUFFER,
         "<html>"
         "<head>"
-        "<title>NestorHTTP guestbook example</title>"
+        "<title>NestorWeb guestbook example</title>"
         "</head>"
         "<body>"
         "<h1>Thank you!</h1>"

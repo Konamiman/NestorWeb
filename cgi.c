@@ -77,16 +77,16 @@ static const char* env_path_translated = "PATH_TRANSLATED";
 static const char* env_remote_addr = "REMOTE_ADDR";
 static const char* env_content_type = "CONTENT_TYPE";
 static const char* env_content_length = "CONTENT_LENGTH";
-static const char* env_base_directory = "_NHTTP_BASE_DIR";
+static const char* env_base_directory = "_NWEB_BASE_DIR";
 const char* env_remote_user = "REMOTE_USER";
 const char* env_remote_password = "REMOTE_PASSWORD";
 
 static void CreateTempFilePaths()
 {
     strcpy(temp_in_filename, temp_directory);
-    strcat(temp_in_filename, "_NHTTPIN.$");
+    strcat(temp_in_filename, "_NWEBIN.$");
     strcpy(temp_out_filename, temp_directory);
-    strcat(temp_out_filename, "_NHTTPOUT.$");
+    strcat(temp_out_filename, "_NWEBOUT.$");
 }
 
 
@@ -106,7 +106,7 @@ static void InitializeFixedEnvItems()
     sprintf(data_buffer, "%i", state.tcpPort);
     SetEnvironmentItem(env_server_port, data_buffer);
 
-    SetEnvironmentItem(env_server_software, "NestorHTTP/" VERSION);
+    SetEnvironmentItem(env_server_software, "NestorWeb/" VERSION);
 
     SetEnvironmentItem(env_base_directory, state.baseDirectory);
 }
@@ -226,6 +226,7 @@ bool CreateAndRedirectInFile()
     if(!input_content_length_received && !request_is_get && !request_is_head)
     {
         PrintUnlessSilent("*** Content-Length header not received\r\n");
+        printf("--- 1\r\n");
         SendBadRequestError();
         CloseConnectionToClient();
         return false;
@@ -334,6 +335,7 @@ void StartSendingCgiResult()
         switch(error_code_from_cgi)
         {
             case 1:
+                printf("--- 2\r\n");
                 SendBadRequestError();
                 break;
             case 2:
@@ -673,6 +675,8 @@ bool SetupRequestDependantEnvItems()
     byte slashes_count;
     char ch;
 
+    printf("--- %s\r\n", raw_request);
+
     pointer = raw_request;
     slashes_count = 0;
     
@@ -691,6 +695,7 @@ bool SetupRequestDependantEnvItems()
     {
         if(ch == '\0')
         {
+            printf("--- 3\r\n");
             SendBadRequestError();
             CloseConnectionToClient();
             return false;
@@ -717,6 +722,7 @@ bool SetupRequestDependantEnvItems()
         {
             if(ch == '\0')
             {
+                printf("--- 4\r\n");
                 SendBadRequestError();
                 CloseConnectionToClient();
                 return false;
@@ -749,6 +755,7 @@ bool SetupRequestDependantEnvItems()
         {
             if(ch == '\0')
             {
+                printf("--- 5\r\n");
                 SendBadRequestError();
                 CloseConnectionToClient();
                 return false;

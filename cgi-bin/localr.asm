@@ -1,4 +1,4 @@
-;Example of NestorHTTP CGI script that performs a local redirect.
+;Example of NestorWeb CGI script that performs a local redirect.
 ;The server will respond as if the request had been "GET /foo/bar.txt"
 
 CR: equ 13

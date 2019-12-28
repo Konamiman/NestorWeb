@@ -1,4 +1,4 @@
-;NestorHTTP CGI script that returns all the environment items defined in the server
+;NestorWeb CGI script that returns all the environment items defined in the server
 ;and the request body, if any, assuming that it's text.
 ;This can be useful to understand how CGI related environment variables work.
 

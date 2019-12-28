@@ -78,7 +78,7 @@ static const char* dir_list_header_1 =
     "\r\n";
 
 static const char* dir_list_header_2 = 
-    "<title>%s - NestorHTTP</title>"
+    "<title>%s - NestorWeb</title>"
     "</head>"
     "<body>"
     "<h1>Directory of %s</h1>"
@@ -86,7 +86,7 @@ static const char* dir_list_header_2 =
 
 static const char* dir_list_footer = 
     "</table>"
-    "<p><a href=\"http://github.com/Konamiman/NestorHTTP\" target=\"_blank\">NestorHTTP " VERSION "</a></p>"
+    "<p><a href=\"http://github.com/Konamiman/NestorWeb\" target=\"_blank\">NestorWeb " VERSION "</a></p>"
     "</body>"
     "</html>";
 
@@ -575,7 +575,7 @@ void SendResponseStart(int statusCode, char* statusMessage)
     sprintf(TCP_INPUT_DATA_BUFFER_START, "HTTP/1.1 %i %s\r\n", statusCode, statusMessage);
     SendCrlfTerminatedLineToClient(TCP_INPUT_DATA_BUFFER_START);
     SendLineToClient("Connection: close");
-    SendLineToClient("Server: NestorHTTP/" VERSION " (MSX-DOS)");
+    SendLineToClient("Server: NestorWeb/" VERSION " (MSX-DOS)");
 }
 
 
@@ -618,7 +618,7 @@ void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detail
         output_data_buffer,
             "<html>"
             "<head>"
-            "<title>NestorHTTP - error</title>"
+            "<title>NestorWeb - error</title>"
             "<style type='text/css'>"
             "body {font-family: sans-serif;} .footer {font-size: small; color: gray; font-style: italic;}"
             "a {font-size: small; color: gray; text-decoration: none;}"
@@ -627,7 +627,7 @@ void SendErrorResponseToClient(int statusCode, char* statusMessage, char* detail
             "<body>"
             "<h1>%i %s</h1>"
             "<p>%s</p>"
-            "<p class='footer'><a href=\"http://github.com/Konamiman/NestorHTTP\" target=\"_blank\">NestorHTTP " VERSION "</a></p>"
+            "<p class='footer'><a href=\"http://github.com/Konamiman/NestorWeb\" target=\"_blank\">NestorWeb " VERSION "</a></p>"
             "</body>"
             "</html>",
         statusCode,
@@ -800,6 +800,7 @@ void ProcessFileOrDirectoryRequest()
     }
     else if(error != 0)
     {
+        printf("--- 6\r\n");
         SendBadRequestError();
         CloseConnectionToClient();
         return;

@@ -9,11 +9,11 @@ ifeq ($(OS),Windows_NT)
 	RM = del
 endif
 
-all: nhttp.com
+all: nweb.com
 
-nhttp.com: nhttp.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h auth.h auth.rel
-	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nhttp.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel auth.rel nhttp.c
-	hex2bin -e com nhttp.ihx
+nweb.com: nhttp.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h auth.h auth.rel
+	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nweb.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel auth.rel nhttp.c
+	hex2bin -e com nweb.ihx
 
 system.rel: system.c system.h msxdos.h
 	sdcc -c $(COMMON_FLAGS) system.c
@@ -40,11 +40,18 @@ clean:
 	$(RM) *.lst
 	$(RM) *.lk
 	$(RM) *.noi
-	$(RM) nhttp.asm
-	$(RM) nhttp.rel
+	$(RM) nweb.asm
+	$(RM) nweb.rel
 	$(RM) system.rel
+	$(RM) system.asm
 	$(RM) tcpip.rel
+	$(RM) tcpip.asm
 	$(RM) http.rel
+	$(RM) http.asm
 	$(RM) cgi.rel
+	$(RM) cgi.asm
 	$(RM) utils.rel
+	$(RM) utils.asm
 	$(RM) auth.rel
+	$(RM) auth.asm
+
