@@ -663,6 +663,10 @@ bool SetupRequestDependantEnvItems()
     //--+ +--------------------++-----+ +------+ +------+
     //verb    script_name      path_info query_s protocol
 
+    //NOTE: REMOTE_USER and REMOTE_PASSWORD are set in RunCgi,
+    //we can set them now because we haven't received the
+    //"Authorization" header yet.
+
     char* pointer;
     char* previous_pointer;
     char* temp;

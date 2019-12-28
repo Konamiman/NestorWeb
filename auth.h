@@ -11,7 +11,7 @@ char* AuthModeAsString();
 void SendUnauthorizedError();
 void InitializeAuthenticationBuffers();
 bool ProcessAuthenticationHeader(bool forCgi);
-bool ProcessAuthentication(bool forCgi);
+bool Authenticate(bool forCgi);
 void SendForbiddenError();
 void SetAuthRelatedEnvItems();
 

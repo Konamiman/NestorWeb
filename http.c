@@ -753,7 +753,7 @@ void ProcessFileOrDirectoryRequest()
 
     is_cgi = must_run_cgi && !(state.directoryListingEnabled && send_as_attachment);
 
-    if(!ProcessAuthentication(is_cgi))
+    if(!Authenticate(is_cgi))
         return;
 
     //We need to treat requesting the root resource + the base directory being the root of the drive

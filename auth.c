@@ -150,7 +150,7 @@ bool ProcessAuthenticationHeader(bool forCgi)
 }
 
 
-bool ProcessAuthentication(bool forCgi)
+bool Authenticate(bool forCgi)
 {
     if(state.authenticationMode == AUTH_MODE_NONE)
         return true;
@@ -183,7 +183,5 @@ void SendForbiddenError()
 void SetAuthRelatedEnvItems()
 {
     SetEnvironmentItem(env_remote_user, current_user);
-
-    if(state.authenticationMode != AUTH_MODE_STATIC_AND_CGI)
-        SetEnvironmentItem(env_remote_password, current_password);
+    SetEnvironmentItem(env_remote_password, current_password);
 }
