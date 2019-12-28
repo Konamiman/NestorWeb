@@ -11,6 +11,7 @@
 #include "version.h"
 #include <stdio.h>
 #include <string.h>
+#include "auth.h"
 
 extern applicationState state;
 extern fileInfoBlock file_fib;
@@ -33,6 +34,8 @@ extern bool request_is_get;
 extern bool request_is_head;
 extern dateTime fib_date;
 extern dateTime if_modified_since_date;
+extern char current_user[];
+extern char current_password[];
 
 static byte error_code_from_cgi;
 static char* cgi_header_pointer;
@@ -75,7 +78,8 @@ static const char* env_remote_addr = "REMOTE_ADDR";
 static const char* env_content_type = "CONTENT_TYPE";
 static const char* env_content_length = "CONTENT_LENGTH";
 static const char* env_base_directory = "_NHTTP_BASE_DIR";
-
+const char* env_remote_user = "REMOTE_USER";
+const char* env_remote_password = "REMOTE_PASSWORD";
 
 static void CreateTempFilePaths()
 {
@@ -166,6 +170,8 @@ void RunCgi()
         CloseConnectionToClient();
         return;
     }
+
+    SetAuthRelatedEnvItems();
 
     PrintUnlessSilent("Running CGI script\r\n");
 
@@ -309,6 +315,8 @@ void CleanupCgiEngine()
     DeleteEnvironmentItem(env_server_protocol);
     DeleteEnvironmentItem(env_path_translated);
     DeleteEnvironmentItem(env_remote_addr);
+    DeleteEnvironmentItem(env_remote_user);
+    DeleteEnvironmentItem(env_remote_password);
 
     DeleteEnvironmentItem(env_base_directory);
 
@@ -336,6 +344,12 @@ void StartSendingCgiResult()
                 break;
             case 4:
                 SendNotModifiedStatus();
+                break;
+            case 5:
+                SendUnauthorizedError();
+                break;
+            case 6:
+                SendForbiddenError();
                 break;
             default:
                 SendInternalError();
@@ -649,6 +663,10 @@ bool SetupRequestDependantEnvItems()
     //--+ +--------------------++-----+ +------+ +------+
     //verb    script_name      path_info query_s protocol
 
+    //NOTE: REMOTE_USER and REMOTE_PASSWORD are set in RunCgi,
+    //we can set them now because we haven't received the
+    //"Authorization" header yet.
+
     char* pointer;
     char* previous_pointer;
     char* temp;
@@ -782,6 +800,9 @@ void ProcessHeaderForCgi()
     bool no_body;
 
     no_body = request_is_get || request_is_head;
+
+    if(ProcessAuthenticationHeader(true))
+        return;
     
     if(StringStartsWith(data_buffer, "Connection:") || StringStartsWith(data_buffer, "Upgrade-Insecure-Requests:"))
         return;
@@ -829,7 +850,6 @@ void ProcessHeaderForCgi()
         strcpy(header_name_buffer+5, data_buffer);
         pointer = header_name_buffer;
     }
-        
 
     SetEnvironmentItem(pointer, value_pointer);
 }

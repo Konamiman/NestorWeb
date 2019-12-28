@@ -9,9 +9,11 @@
 *.sym
 asm.h
 asm.lib
+base64.h
+base64.lib
 makefile
 .vscode
 !crt0msx_msxdos2_fork.asm
 *.cgi
-!cgi-bin/*.asm
+
 

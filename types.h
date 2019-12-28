@@ -28,6 +28,7 @@ typedef struct {
     byte stdinFileHandleCopy;
     byte stdoutFileHandleCopy;
     byte requestMethodType;
+    byte authenticationMode;
 } applicationState;
 
 
