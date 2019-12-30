@@ -1,0 +1,3 @@
+# NestorWeb CGI scripts development guide
+
+TODO...

@@ -75,8 +75,7 @@ when executing _TERM (0 if it executes _TERM0 instead, or if it does RET or JP 0
 
 Note that when proc_join runs, the PROGRAM environment item will be correctly set
 as the path of the main program; but the command line arguments
-(both at address 0x80 and in the PARAMETERS variable) will be the ones that
-were passed to the subprocess. If you need to keep information originally supplied
+will be lost. If you need to keep information originally supplied
 as arguments to the main program, pass it to proc_fork as state data.
 
 This function acts as "main": the program terminates when the function returns,
