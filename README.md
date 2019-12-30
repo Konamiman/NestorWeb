@@ -19,7 +19,7 @@ The good:
   * Sends files as attachments (with a `Content-Disposition: attachment` header) if `?a=1` is added to the request.
   * Requests containing `..` are rejected for security (so that files outside of the base directory aren't accessible)
 * Directory listings: when a directory is requested is sends a list of the contained files .
-  * Disabled by default, must be enabled in command line.
+  * Disabled by default, must be enabled via command line.
   * Sent with a `Cache-Control` header specifying a cache duration of 1 hour.
   * If a request for a directory doesn't end with `/` it sends a `308 Moved Permanently` response to the same location ending with `/`, this is necessary so that relative links to files within the directory render correctly in browsers.
 * Default document: serves the `INDEX.HTM` file if a directory is requested (only if directory listings are disabled).
@@ -81,6 +81,11 @@ A file will be recognized as a CGI script and executed if all of the following a
 CGI scripts are implemented as regular MSX-DOS executable programs that get the request via environment items and STDIN (file handle 0), and write the response to STDOUT (file handle 1). See the [CGI development guide](CGI.md) for details.
 
 After a CGI script terminates its execution NestorWeb loads itself from disk again, therefore it's recommended to run `NWEB.COM` from a fast storage device, ideally the RAM disk. The same goes with the temporary directory: it's recommended to set `NWEB_TEMP` (or `TEMP`) to the RAM disk whenever possible (if a big enough RAM disk can be created to handle the biggest request and response that is expected to be handled by CGI scripts).
+
+
+## Security considerations
+
+I shouldn't be saying this but: yes, using basic authentication over plain HTTP is highly unsecure; and storing passwords in environment items isn't any more secure either. Also no, NestorWeb hasn't passed anything remotely similar to a security audit and is not "battle-tested". But come on, this is a web server for MSX computers. If you use it for something really important or to serve sensitive data, well, it's only your fault; I provide this program as-is and... well, go and read [the license](LICENSE.txt) please.
 
 
 ## Last but not least...
