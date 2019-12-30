@@ -1,4 +1,4 @@
-;Example of a NestorHTTP CGI script that sends a custom status code and message.
+;Example of a NestorWeb CGI script that sends a custom status code and message.
 
 CR: equ 13
 LF: equ 10

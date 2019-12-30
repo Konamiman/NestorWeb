@@ -1,19 +1,19 @@
-# crt0msx_msxdos2_fork.rel, printf_simple.rel, putchar_msxdos.rel, asm.lib/.h
+# crt0msx_msxdos2_fork.rel, printf_simple.rel, putchar_msxdos.rel, asm.lib/.h, base64.lib/.h
 # are available at konamiman.com
 ALLOCS = 1000 # Higher value = smaller generated file but slower compilation. Recommended for release: 100000
 COMMON_FLAGS = -mz80 --disable-warning 196 --disable-warning 85 --max-allocs-per-node $(ALLOCS) --allow-unsafe-read --opt-code-size
 PROGRAM_FLAGS = --code-loc 0x410 --data-loc 0 --no-std-crt0
-LIBS = crt0msx_msxdos2_fork.rel printf_simple.rel putchar_msxdos.rel asm.lib
+LIBS = crt0msx_msxdos2_fork.rel printf_simple.rel putchar_msxdos.rel asm.lib base64.lib
 
 ifeq ($(OS),Windows_NT)
 	RM = del
 endif
 
-all: nhttp.com
+all: nweb.com
 
-nhttp.com: nhttp.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h
-	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nhttp.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel nhttp.c
-	hex2bin -e com nhttp.ihx
+nweb.com: nhttp.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h auth.h auth.rel
+	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nweb.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel auth.rel nhttp.c
+	hex2bin -e com nweb.ihx
 
 system.rel: system.c system.h msxdos.h
 	sdcc -c $(COMMON_FLAGS) system.c
@@ -24,11 +24,14 @@ tcpip.rel: tcpip.c tcpip.h buffers.h
 http.rel: http.c http.h version.h msxdos.h buffers.h
 	sdcc -c $(COMMON_FLAGS) http.c
 
-cgi.rel: cgi.c cgi.h version.h msxdos.h buffers.h
+cgi.rel: cgi.c cgi.h version.h msxdos.h buffers.h version.h
 	sdcc -c $(COMMON_FLAGS) cgi.c
 
 utils.rel: utils.c utils.h
 	sdcc -c $(COMMON_FLAGS) utils.c
+
+auth.rel: auth.c auth.h
+	sdcc -c $(COMMON_FLAGS) auth.c
 
 clean:
 	$(RM) *.ihx
@@ -37,10 +40,18 @@ clean:
 	$(RM) *.lst
 	$(RM) *.lk
 	$(RM) *.noi
-	$(RM) nhttp.asm
-	$(RM) nhttp.rel
+	$(RM) nweb.asm
+	$(RM) nweb.rel
 	$(RM) system.rel
+	$(RM) system.asm
 	$(RM) tcpip.rel
+	$(RM) tcpip.asm
 	$(RM) http.rel
+	$(RM) http.asm
 	$(RM) cgi.rel
+	$(RM) cgi.asm
 	$(RM) utils.rel
+	$(RM) utils.asm
+	$(RM) auth.rel
+	$(RM) auth.asm
+

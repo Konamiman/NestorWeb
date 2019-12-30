@@ -1,4 +1,4 @@
-;Example of NestorHTTP CGI script that retuns an error message
+;Example of NestorWeb CGI script that retuns an error message
 ;using the system-defined markup.
 
 CR: equ 13

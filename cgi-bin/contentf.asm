@@ -1,4 +1,4 @@
-;Example of NestorHTTP SCGI script that returns a response body from a content file.
+;Example of NestorWeb SCGI script that returns a response body from a content file.
 ;The file for this example is to be located at <base directory>\cgi-bin\contentf\datafile.dat
 
 CR: equ 13

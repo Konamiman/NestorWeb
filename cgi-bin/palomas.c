@@ -19,9 +19,9 @@ typedef unsigned char bool;
 #define _WRITE 0x49
 #define _TERM 0x62
 
-#define NHTTP_ERR_BAD_REQUEST 1
-#define NHTTP_ERR_NOT_FOUND 2
-#define NHTTP_ERR_BAD_METHOD 3
+#define NWEB_ERR_BAD_REQUEST 1
+#define NWEB_ERR_NOT_FOUND 2
+#define NWEB_ERR_BAD_METHOD 3
 
 #define buffer ((char*)0x4000)
 Z80_registers regs;

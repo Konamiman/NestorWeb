@@ -21,7 +21,7 @@ extern byte data_buffer[];
 extern const char* env_remote_user;
 extern const char* env_remote_password;
 
-const char* auth_mode_backup_env_item = "_NHTTP_AUTH_MODE";
+const char* auth_mode_backup_env_item = "_NWEB_AUTH_MODE";
 
 char* InitializeAuthentication()
 {
@@ -32,17 +32,17 @@ char* InitializeAuthentication()
     current_user[1] = '\0';
     SetEnvironmentItem(auth_mode_backup_env_item, current_user);
 
-    GetEnvironmentItem("NHTTP_REALM", auth_realm);
+    GetEnvironmentItem("NWEB_REALM", auth_realm);
     if(*auth_realm == '\0')
-        strcpy(auth_realm, "NestorHTTP");
+        strcpy(auth_realm, "NestorWeb");
 
     if(state.authenticationMode == AUTH_MODE_NONE)
         return empty_str;
 
-    GetEnvironmentItem("NHTTP_USER", auth_user);
-    GetEnvironmentItem("NHTTP_PASSWORD", auth_password);
+    GetEnvironmentItem("NWEB_USER", auth_user);
+    GetEnvironmentItem("NWEB_PASSWORD", auth_password);
     if(*auth_user == '\0' || *auth_password == '\0')
-        return "NHTTP_USER and NHTTP_PASSWORD environment items are required when using authentication.";
+        return "NWEB_USER and NWEB_PASSWORD environment items are required when using authentication.";
 
     return empty_str;
 }

@@ -1,4 +1,4 @@
-;Example of NestorHTTP CGI script that performs a client redirect.
+;Example of NestorWeb CGI script that performs a client redirect.
 ;The client will receive a "302 Found" status.
 
 CR: equ 13

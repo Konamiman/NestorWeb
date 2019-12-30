@@ -1,4 +1,4 @@
-;NestorHTTP CGI script to return the current date on the server.
+;NestorWeb CGI script to return the current date on the server.
 ;This one uses _CONOUT and _STROUT to write the request body to STDOUT,
 ;but using _WRITE instead is generally recommended.
 
