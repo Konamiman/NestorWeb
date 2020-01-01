@@ -1,4 +1,4 @@
-;Example of NestorWeb CGI script that returns a predefined error message.
+;Example of NestorWeb CGI script that returns a predefined error response.
 ;The available predefined error codes are:
 ;
 ;1: 400 Bad Request
@@ -10,6 +10,6 @@
 
 _TERM: equ 62h
 
-    ld b,3
+    ld b,3 ;The client will receive "405 Method Not Allowed"
     ld c,_TERM
     jp 5

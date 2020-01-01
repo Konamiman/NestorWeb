@@ -27,7 +27,7 @@ const char* strHelp =
     "   0: silent, 1: show connections and errors (default), 2: show all headers\r\n"
     "t: Inactivity timeout for client connections in seconds, default is " DEFAULT_INACTIVITY_TIMEOUT_SECS_STR "\r\n"
     "d: enable directory listing when 1 (default: disabled)\r\n"
-    "d: enable CGI scripts when 1 (default: enabled)\r\n"
+    "c: enable CGI scripts when 1 (default: enabled)\r\n"
     "a: authentication mode: 0=none (default), 1=static content, 2=static and CGI\r\n"
     "\r\n"
     "When directory listing is disabled, a request for \"/\" or for a directory will\r\n"
