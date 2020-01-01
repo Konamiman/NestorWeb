@@ -549,7 +549,6 @@ static bool ProcessFirstHeaderOfCgiResult()
             return false;
 
         must_send_cgi_contents_file = true;
-
     }
 
     return true;

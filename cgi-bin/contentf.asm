@@ -18,6 +18,7 @@ _WRITE: equ 49h
 
 HEADERS:
     db "X-CGI-Content-File: contentf\\datafile.dat",CR,LF
+    db "Content-Type: text/plain",CR,LF
     db CR,LF
     ;Note: response body is ignored (the file contents is sent instead)
 HEADER_END:

@@ -85,7 +85,7 @@ After a CGI script terminates its execution NestorWeb loads itself from disk aga
 
 ## Security considerations
 
-I shouldn't be saying this but: yes, using basic authentication over plain HTTP is highly unsecure; and storing passwords in environment items isn't any more secure either. Also no, NestorWeb hasn't passed anything remotely similar to a security audit and is not "battle-tested". But come on, this is a web server for MSX computers. If you use it for something really important or to serve sensitive data, well, it's only your fault; I provide this program as-is and... well, go and read [the license](LICENSE.txt) please.
+I shouldn't need to say this but: yes, using basic authentication over plain HTTP is highly unsecure; and storing passwords in environment items isn't any more secure either. Also no, NestorWeb hasn't passed anything remotely similar to a security audit and is not "battle-tested". But come on, this is a web server for MSX computers. If you use it for something really important or to serve sensitive data, well, it's only your fault; I provide this program as-is and... well, go and read [the license](LICENSE.txt) please.
 
 
 ## Last but not least...
