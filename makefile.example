@@ -1,4 +1,4 @@
-# crt0msx_msxdos2_fork.rel, printf_simple.rel, putchar_msxdos.rel, asm.lib/.h, base64.lib/.h
+# printf_simple.rel, putchar_msxdos.rel, asm.lib/.h, base64.lib/.h
 # are available at konamiman.com
 ALLOCS = 1000 # Higher value = smaller generated file but slower compilation. Recommended for release: 100000
 COMMON_FLAGS = -mz80 --disable-warning 196 --disable-warning 85 --max-allocs-per-node $(ALLOCS) --allow-unsafe-read --opt-code-size
@@ -11,9 +11,12 @@ endif
 
 all: nweb.com
 
-nweb.com: nweb.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h auth.h auth.rel
-	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nweb.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel auth.rel newb.c
+nweb.com: nweb.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h auth.h auth.rel crt0msx_msxdos2_fork.rel
+	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nweb.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel auth.rel nweb.c
 	hex2bin -e com nweb.ihx
+
+crt0msx_msxdos2_fork.rel: crt0msx_msxdos2_fork.asm
+	sdasz80 -g -o crt0msx_msxdos2_fork.rel crt0msx_msxdos2_fork.asm
 
 system.rel: system.c system.h msxdos.h
 	sdcc -c $(COMMON_FLAGS) system.c
@@ -54,4 +57,3 @@ clean:
 	$(RM) utils.asm
 	$(RM) auth.rel
 	$(RM) auth.asm
-
