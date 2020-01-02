@@ -187,7 +187,7 @@ MSX
 CGI scripts can instruct NestorWeb to use the contents of a file for generating the response body by using the `X-CGI-Content-File` header as follows:
 
 ```
-X-CGI-Content-File: <file path>`
+X-CGI-Content-File: <file path>
 <additional headers>
 <blank line>
 ```

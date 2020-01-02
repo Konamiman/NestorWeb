@@ -31,6 +31,8 @@ The not-so-good:
 * Serves only one client at the same time.
 * No MIME types for static content, `Content-Type` is never sent when serving files.
 * Absolutely no support for text encodings. I have no idea of what will happen when requesting a file with a non-ASCII name.
+* Maximum HTTP request line length supported is 256 bytes, longer request lines will be rejected.
+* Maximum header length supported is 256 bytes, longer headers will be truncated.
 * Basic authentication support... but with one single set of credentials. CGI scripts can handle authentication by themselves, though.
 
 ## Usage

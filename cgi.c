@@ -78,6 +78,7 @@ static const char* env_remote_addr = "REMOTE_ADDR";
 static const char* env_content_type = "CONTENT_TYPE";
 static const char* env_content_length = "CONTENT_LENGTH";
 static const char* env_base_directory = "_NWEB_BASE_DIR";
+const char* env_auth_type = "AUTH_TYPE";
 const char* env_remote_user = "REMOTE_USER";
 const char* env_remote_password = "REMOTE_PASSWORD";
 
@@ -317,6 +318,7 @@ void CleanupCgiEngine()
     DeleteEnvironmentItem(env_remote_addr);
     DeleteEnvironmentItem(env_remote_user);
     DeleteEnvironmentItem(env_remote_password);
+    DeleteEnvironmentItem(env_auth_type);
 
     DeleteEnvironmentItem(env_base_directory);
 
@@ -801,7 +803,10 @@ void ProcessHeaderForCgi()
     no_body = request_is_get || request_is_head;
 
     if(ProcessAuthenticationHeader(true))
+    {
+        SetEnvironmentItem(env_auth_type, "Basic");
         return;
+    }
     
     if(StringStartsWith(data_buffer, "Connection:") || StringStartsWith(data_buffer, "Upgrade-Insecure-Requests:"))
         return;

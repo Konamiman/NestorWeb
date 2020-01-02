@@ -18,6 +18,7 @@ static char current_password[255+1];
 extern applicationState state;
 extern const char* empty_str;
 extern byte data_buffer[];
+extern const char* env_auth_type;
 extern const char* env_remote_user;
 extern const char* env_remote_password;
 
@@ -74,6 +75,7 @@ void InitializeAuthenticationBuffers()
 {
     *current_user = '\0';
     *current_password = '\0';
+    DeleteEnvironmentItem(env_auth_type);
     DeleteEnvironmentItem(env_remote_user);
     DeleteEnvironmentItem(env_remote_password);
 }
