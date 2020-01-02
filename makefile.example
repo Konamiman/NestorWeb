@@ -11,8 +11,8 @@ endif
 
 all: nweb.com
 
-nweb.com: nhttp.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h auth.h auth.rel
-	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nweb.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel auth.rel nhttp.c
+nweb.com: nweb.c system.rel tcpip.rel http.rel cgi.rel utils.rel version.h tcpip.h auth.h auth.rel
+	sdcc $(COMMON_FLAGS) $(PROGRAM_FLAGS) -o nweb.ihx $(LIBS) system.rel tcpip.rel http.rel cgi.rel utils.rel auth.rel newb.c
 	hex2bin -e com nweb.ihx
 
 system.rel: system.c system.h msxdos.h

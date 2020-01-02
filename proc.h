@@ -79,7 +79,7 @@ will be lost. If you need to keep information originally supplied
 as arguments to the main program, pass it to proc_fork as state data.
 
 This function acts as "main": the program terminates when the function returns,
-and the returnd value will be passed to the _TERM function.
+and the returned value will be passed to the _TERM function.
 */
 unsigned char proc_join(unsigned char error_code_from_subprocess, void* state_data);
 
